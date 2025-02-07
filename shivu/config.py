@@ -10,7 +10,7 @@ class Config(object):
     PHOTO_URL = ["http://ibb.co/WvZ6gLTr"]
     SUPPORT_CHAT = "CollectYourLegends"
     UPDATE_CHAT = "CollectYourLegends"
-    BOT_USERNAME = "@LegendsDropBot"
+    BOT_USERNAME = "LegendsDropBot"
     CHARA_CHANNEL_ID = "-1002431614358"
     api_id = 26626068
     api_hash = "bf423698bcbe33cfd58b11c78c42caa2"

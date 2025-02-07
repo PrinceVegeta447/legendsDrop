@@ -1,1 +1,1 @@
-worker: python shivu/main.py
+web: python shivu/main.py

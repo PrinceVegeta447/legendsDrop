@@ -64,7 +64,7 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
     async with lock:
         # Fetch the latest message frequency from MongoDB
         chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
-        message_frequency = chat_frequency.get('message_frequency', 100) if chat_frequency else 100
+        message_frequency = chat_frequency.get('message_frequency', 5) if chat_frequency else 5
 
         # Prevent spam (max 10 consecutive messages per user)
         if chat_id in last_user and last_user[chat_id]['user_id'] == user_id:

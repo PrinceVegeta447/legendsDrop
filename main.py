@@ -53,6 +53,7 @@ def escape_markdown(text):
 
 
 
+
 async def message_counter(update: Update, context: CallbackContext) -> None:
     chat_id = str(update.effective_chat.id)
     user_id = update.effective_user.id
@@ -62,9 +63,8 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
     lock = locks[chat_id]
 
     async with lock:
-        # Fetch the latest message frequency from MongoDB
         chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
-        message_frequency = chat_frequency.get('message_frequency', 5) if chat_frequency else 5
+        message_frequency = chat_frequency.get('message_frequency', 100) if chat_frequency else 100
 
         # Prevent spam (max 10 consecutive messages per user)
         if chat_id in last_user and last_user[chat_id]['user_id'] == user_id:
@@ -82,50 +82,53 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
         else:
             last_user[chat_id] = {'user_id': user_id, 'count': 1}
 
-        # Count messages per group
         message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
 
-        # Drop a DBL character when message count reaches droptime
+        print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {message_counts[chat_id]} | Drop at: {message_frequency}")
+
         if message_counts[chat_id] >= message_frequency:
+            print(f"🟢 [DEBUG] Triggering send_image() in {chat_id}")
             await send_image(update, context)
-            message_counts[chat_id] = 0 
-            print(f"🔍 [DEBUG] Group: {chat_id} | Message Count: {message_counts[chat_id]} | Drop Frequency: {message_frequency}")# Reset after drop
+            message_counts[chat_id] = 0
             
+
 async def send_image(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
 
     all_characters = list(await collection.find({}).to_list(length=None))
-    
+
+    if not all_characters:
+        print(f"❌ [DEBUG] No characters found in MongoDB for {chat_id}!")
+        return  # No characters available in the database
+
+    print(f"🟢 [DEBUG] Dropping character in {chat_id} | Total Characters: {len(all_characters)}")
+
     if chat_id not in sent_characters:
         sent_characters[chat_id] = []
 
-    # Reset list if all characters have been sent
     if len(sent_characters[chat_id]) == len(all_characters):
         sent_characters[chat_id] = []
 
-    # Choose a random character that hasn't been sent yet
-    available_characters = [c for c in all_characters if c['id'] not in sent_characters[chat_id]]
+    available_characters = [c for c in all_characters if c['_id'] not in sent_characters[chat_id]]
+
     if not available_characters:
-        return  # No characters available to send
+        print(f"❌ [DEBUG] All characters already dropped in {chat_id}, resetting...")
+        sent_characters[chat_id] = []
+        return
 
     character = random.choice(available_characters)
-    sent_characters[chat_id].append(character['id'])
+    sent_characters[chat_id].append(character['_id'])
     last_characters[chat_id] = character
 
-    # Reset first correct guess tracking
-    if chat_id in first_correct_guesses:
-        del first_correct_guesses[chat_id]
-    print(f"🟢 [DEBUG] Dropping Character in {chat_id} | Total Characters: {len(all_characters)}")
+    print(f"🎯 [DEBUG] Selected Character: {character['name']} | Image: {character['img_url']}")
 
-    # Send the DBL-themed character drop message
     await context.bot.send_photo(
         chat_id=chat_id,
         photo=character['img_url'],
-        caption=f"""🔥 **A New {character['rarity']} Fighter Has Appeared!** 🔥  
+        caption=f"""🔥 **A Character Has Appeared!** 🔥  
 ⚡ Be the first to **/collect Character Name** to claim them!""",
         parse_mode='Markdown'
     )
-
             
 async def guess(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id

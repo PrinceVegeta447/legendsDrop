@@ -7,7 +7,7 @@ from pyrogram.types import Message
 ADMINS = [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
 
 
-@shivuu.on_message(filters.command("changetime"))
+@shivuu.on_message(filters.command("set_droptime"))
 async def change_time(client: Client, message: Message):
     user_id = message.from_user.id
     chat_id = message.chat.id
@@ -21,7 +21,7 @@ async def change_time(client: Client, message: Message):
     try:
         args = message.command
         if len(args) != 2:
-            await message.reply_text("⚠️ **Usage:** `/changetime NUMBER`")
+            await message.reply_text("⚠️ **Usage:** `/set_droptime NUMBER`")
             return
 
         new_frequency = int(args[1])
@@ -46,7 +46,7 @@ async def change_time(client: Client, message: Message):
         await message.reply_text(f"❌ Failed to change droptime: {str(e)}")
 
 
-@shivuu.on_message(filters.command("viewdroptime"))
+@shivuu.on_message(filters.command("droptime"))
 async def view_droptime(client: Client, message: Message):
     chat_id = message.chat.id
 

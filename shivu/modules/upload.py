@@ -35,8 +35,8 @@ async def get_next_sequence_number(sequence_name):
 # Function to upload a character
 async def upload(update: Update, context: CallbackContext) -> None:
     if update.effective_user.id not in sudo_users and update.effective_user.id != OWNER_ID:
-    await update.message.reply_text("🚫 You don't have permission to upload characters!")
-    return
+        await update.message.reply_text("🚫 You don't have permission to upload characters!")
+        return
 
     try:
         args = context.args

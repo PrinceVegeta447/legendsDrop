@@ -48,8 +48,7 @@ I am your **Dragon Ball Legends Collector Bot**! 🐉✨
             [InlineKeyboardButton("⚡ ADD ME TO GROUP ⚡", url=f'http://t.me/{BOT_USERNAME}?startgroup=new')],
             [InlineKeyboardButton("🔹 SUPPORT", url=f'https://t.me/{SUPPORT_CHAT}'),
             InlineKeyboardButton("🔸 UPDATES", url=f'https://t.me/{UPDATE_CHAT}')],
-            [InlineKeyboardButton("📜 HELP", callback_data='help')],
-            [InlineKeyboardButton("💾 SOURCE CODE", url=f'https://github.com/PrinceVegeta447/legendsDrop')]
+            [InlineKeyboardButton("📜 HELP", callback_data='help')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         photo_url = random.choice(PHOTO_URL)
@@ -63,7 +62,6 @@ I am your **Dragon Ball Legends Collector Bot**! 🐉✨
             [InlineKeyboardButton("🔹 SUPPORT", url=f'https://t.me/{SUPPORT_CHAT}'),
             InlineKeyboardButton("🔸 UPDATES", url=f'https://t.me/{UPDATE_CHAT}')],
             [InlineKeyboardButton("📜 HELP", callback_data='help')],
-            [InlineKeyboardButton("💾 SOURCE CODE", url=f'https://github.com/PrinceVegeta447/legendsDrop')]
         ]
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -106,8 +104,7 @@ async def button(update: Update, context: CallbackContext) -> None:
             [InlineKeyboardButton("⚡ ADD ME TO GROUP ⚡", url=f'http://t.me/{BOT_USERNAME}?startgroup=new')],
             [InlineKeyboardButton("🔹 SUPPORT", url=f'https://t.me/{SUPPORT_CHAT}'),
             InlineKeyboardButton("🔸 UPDATES", url=f'https://t.me/{UPDATE_CHAT}')],
-            [InlineKeyboardButton("📜 HELP", callback_data='help')],
-            [InlineKeyboardButton("💾 SOURCE CODE", url=f'https://github.com/PrinceVegeta447/legendsDrop')]
+            [InlineKeyboardButton("📜 HELP", callback_data='help')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 

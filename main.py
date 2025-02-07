@@ -55,7 +55,7 @@ def escape_markdown(text):
 
 
 async def message_counter(update: Update, context: CallbackContext) -> None:
-    chat_id = str(update.effective_chat.id)
+    chat_id = str(update.effective_chat.id)  # Ensure chat_id is a string
     user_id = update.effective_user.id
 
     if chat_id not in locks:
@@ -63,34 +63,21 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
     lock = locks[chat_id]
 
     async with lock:
-        chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
-        message_frequency = chat_frequency.get('message_frequency', 100) if chat_frequency else 100
+        # Fetch droptime from MongoDB
+        chat_frequency = await user_totals_collection.find_one({"chat_id": chat_id})
+        message_frequency = int(chat_frequency["message_frequency"]) if chat_frequency else 100  # Convert to int
 
-        # Prevent spam (max 10 consecutive messages per user)
-        if chat_id in last_user and last_user[chat_id]['user_id'] == user_id:
-            last_user[chat_id]['count'] += 1
-            if last_user[chat_id]['count'] >= 10:
-                if user_id in warned_users and time.time() - warned_users[user_id] < 600:
-                    return
-                else:
-                    await update.message.reply_text(
-                        f"⚠️ **Slow down, {update.effective_user.first_name}!**\n"
-                        "Your messages will be ignored for 10 minutes."
-                    )
-                    warned_users[user_id] = time.time()
-                    return
-        else:
-            last_user[chat_id] = {'user_id': user_id, 'count': 1}
+        print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {message_counts.get(chat_id, 0)} | Drop at: {message_frequency}")
 
+        # Count messages per group
         message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
 
-        print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {message_counts[chat_id]} | Drop at: {message_frequency}")
-
+        # If message count reaches the threshold, drop a character
         if message_counts[chat_id] >= message_frequency:
             print(f"🟢 [DEBUG] Triggering send_image() in {chat_id}")
             await send_image(update, context)
-            message_counts[chat_id] = 0
-            
+            message_counts[chat_id] = 0  # Reset counter
+
 
 async def send_image(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
@@ -104,9 +91,6 @@ async def send_image(update: Update, context: CallbackContext) -> None:
     print(f"🟢 [DEBUG] Dropping character in {chat_id} | Total Characters: {len(all_characters)}")
 
     if chat_id not in sent_characters:
-        sent_characters[chat_id] = []
-
-    if len(sent_characters[chat_id]) == len(all_characters):
         sent_characters[chat_id] = []
 
     available_characters = [c for c in all_characters if c['_id'] not in sent_characters[chat_id]]

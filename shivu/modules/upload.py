@@ -1,4 +1,4 @@
-import urllib.request
+import requests
 from pymongo import ReturnDocument
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
@@ -33,6 +33,17 @@ Example:
 8️⃣ Fusion Warrior  
 """
 
+# ✅ Function to generate a unique character ID
+async def get_next_sequence_number(sequence_name):
+    sequence_collection = db.sequences
+    sequence_document = await sequence_collection.find_one_and_update(
+        {'_id': sequence_name}, 
+        {'$inc': {'sequence_value': 1}}, 
+        upsert=True,
+        return_document=ReturnDocument.AFTER
+    )
+    return sequence_document['sequence_value']
+
 # ✅ Function to upload a character
 async def upload(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
@@ -52,8 +63,10 @@ async def upload(update: Update, context: CallbackContext) -> None:
 
         # ✅ Validate image URL
         try:
-            urllib.request.urlopen(image_url)
-        except:
+            response = requests.get(image_url, timeout=5)
+            if response.status_code != 200:
+                raise ValueError("Invalid Image URL")
+        except Exception:
             await update.message.reply_text("❌ Invalid Image URL. Please provide a working link.")
             return
 
@@ -102,21 +115,94 @@ async def upload(update: Update, context: CallbackContext) -> None:
         }
 
         # ✅ Send the character image to the character channel
-        message = await context.bot.send_photo(
-            chat_id=CHARA_CHANNEL_ID,
-            photo=image_url,
-            caption=f"🏆 **New Character Added!**\n\n"
-                    f"🔥 **Character:** {character_name}\n"
-                    f"🎖️ **Rarity:** {rarity}\n"
-                    f"🔹 **Category:** {category}\n"
-                    f"🆔 **ID:** {char_id}\n\n"
-                    f"👤 Added by [{update.effective_user.first_name}](tg://user?id={user_id})",
-            parse_mode='Markdown'
-        )
-
-        character["message_id"] = message.message_id
-        await collection.insert_one(character)
-        await update.message.reply_text(f"✅ `{character_name}` successfully added!")
+        try:
+            message = await context.bot.send_photo(
+                chat_id=CHARA_CHANNEL_ID,
+                photo=image_url,
+                caption=f"🏆 **New Character Added!**\n\n"
+                        f"🔥 **Character:** {character_name}\n"
+                        f"🎖️ **Rarity:** {rarity}\n"
+                        f"🔹 **Category:** {category}\n"
+                        f"🆔 **ID:** {char_id}\n\n"
+                        f"👤 Added by [{update.effective_user.first_name}](tg://user?id={user_id})",
+                parse_mode='Markdown'
+            )
+            character["message_id"] = message.message_id
+            await collection.insert_one(character)
+            await update.message.reply_text(f"✅ `{character_name}` successfully added!")
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ Character added, but couldn't send image. Error: {str(e)}")
 
     except Exception as e:
         await update.message.reply_text(f"❌ Upload failed! Error: {str(e)}\nContact support: {SUPPORT_CHAT}")
+
+# ✅ Function to delete a character
+async def delete(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+
+    if user_id not in sudo_users and user_id != OWNER_ID:
+        await update.message.reply_text("🚫 Only bot owners can delete characters!")
+        return
+
+    try:
+        args = context.args
+        if len(args) != 1:
+            await update.message.reply_text("❌ Incorrect format! Use: `/delete <Character ID>`")
+            return
+
+        character = await collection.find_one_and_delete({'id': args[0]})
+
+        if character and "message_id" in character:
+            await context.bot.delete_message(chat_id=CHARA_CHANNEL_ID, message_id=character["message_id"])
+            await update.message.reply_text(f"✅ Character `{args[0]}` deleted successfully.")
+        else:
+            await update.message.reply_text("⚠️ Character deleted from the database, but was not found in the channel.")
+
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error deleting character: {str(e)}")
+
+# ✅ Function to update character details
+async def update(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+
+    if user_id not in sudo_users and user_id != OWNER_ID:
+        await update.message.reply_text("🚫 You do not have permission to update characters!")
+        return
+
+    try:
+        args = context.args
+        if len(args) != 3:
+            await update.message.reply_text("❌ Incorrect format! Use: `/update <ID> <field> <new_value>`")
+            return
+
+        character = await collection.find_one({'id': args[0]})
+        if not character:
+            await update.message.reply_text("❌ Character not found.")
+            return
+
+        valid_fields = ["img_url", "name", "rarity", "category"]
+        if args[1] not in valid_fields:
+            await update.message.reply_text(f"❌ Invalid field! Use one of: {', '.join(valid_fields)}")
+            return
+
+        # ✅ Handle rarity update
+        if args[1] == "rarity":
+            if args[2] not in rarity_map:
+                await update.message.reply_text("❌ Invalid rarity. Use 1-9.")
+                return
+            new_value = rarity_map[args[2]]
+        else:
+            new_value = args[2]
+
+        # ✅ Update the database
+        await collection.find_one_and_update({'id': args[0]}, {'$set': {args[1]: new_value}})
+
+        await update.message.reply_text(f"✅ Character `{args[0]}` updated successfully!")
+
+    except Exception as e:
+        await update.message.reply_text("❌ Update failed! Make sure the bot has channel permissions.")
+
+# ✅ Add command handlers
+application.add_handler(CommandHandler("upload", upload, block=False))
+application.add_handler(CommandHandler("delete", delete, block=False))
+application.add_handler(CommandHandler("update", update, block=False))

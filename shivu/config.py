@@ -7,7 +7,7 @@ class Config(object):
     GROUP_ID = -1002415126626
     TOKEN = "7586298589:AAHNpgN-iWCazr_yYR4XFANCRfpH4ILl4qg"
     mongo_url = "mongodb+srv://vegetakun447:1jPSDznTX6gy7Nqr@cluster0.hcngy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-    PHOTO_URL = ["https://telegra.ph/file/b925c3985f0f325e62e17.jpg", "https://telegra.ph/file/4211fb191383d895dab9d.jpg"]
+    PHOTO_URL = ["https://graph.org/file/b6cd9f530cdc904b0fd1a-56a5df2513e456b9d5.jpg", "https://graph.org/file/e6b69295248555dd8d12f-e946b56b84838062b9.jpg"]
     SUPPORT_CHAT = "CollectYourLegends"
     UPDATE_CHAT = "CollectYourLegends"
     BOT_USERNAME = "@LegendsDropBot"

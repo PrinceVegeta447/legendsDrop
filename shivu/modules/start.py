@@ -84,7 +84,8 @@ async def button(update: Update, context: CallbackContext) -> None:
 🔹 `/collection` → View your **entire collection**  
 🔹 `/topgroups` → View **Top Groups**  
 🔹 `/top` → View **Top Players**  
-🔹 `/changetime` → Change character drop frequency (Admins only)
+🔹 `/set_droptime` → Change character drop frequency (Admins only)  
+🔹 `/droptime` → View current droptime in your group
 """
         help_keyboard = [[InlineKeyboardButton("⏪ Back", callback_data='back')]]
         reply_markup = InlineKeyboardMarkup(help_keyboard)

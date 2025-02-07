@@ -52,6 +52,7 @@ def escape_markdown(text):
     return re.sub(r'([%s])' % re.escape(escape_chars), r'\\\1', text)
 
 
+
 async def message_counter(update: Update, context: CallbackContext) -> None:
     chat_id = str(update.effective_chat.id)
     user_id = update.effective_user.id
@@ -61,39 +62,33 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
     lock = locks[chat_id]
 
     async with lock:
-        
+        # Fetch the latest message frequency from MongoDB
         chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
-        if chat_frequency:
-            message_frequency = chat_frequency.get('message_frequency', 100)
-        else:
-            message_frequency = 100
+        message_frequency = chat_frequency.get('message_frequency', 100) if chat_frequency else 100
 
-        
+        # Prevent spam (max 10 consecutive messages per user)
         if chat_id in last_user and last_user[chat_id]['user_id'] == user_id:
             last_user[chat_id]['count'] += 1
             if last_user[chat_id]['count'] >= 10:
-            
                 if user_id in warned_users and time.time() - warned_users[user_id] < 600:
                     return
                 else:
-                    
-                    await update.message.reply_text(f"⚠️ Don't Spam {update.effective_user.first_name}...\nYour Messages Will be ignored for 10 Minutes...")
+                    await update.message.reply_text(
+                        f"⚠️ **Slow down, {update.effective_user.first_name}!**\n"
+                        "Your messages will be ignored for 10 minutes."
+                    )
                     warned_users[user_id] = time.time()
                     return
         else:
             last_user[chat_id] = {'user_id': user_id, 'count': 1}
 
-    
-        if chat_id in message_counts:
-            message_counts[chat_id] += 1
-        else:
-            message_counts[chat_id] = 1
+        # Count messages per group
+        message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
 
-    
-        if message_counts[chat_id] % message_frequency == 0:
+        # Drop a DBL character when message count reaches droptime
+        if message_counts[chat_id] >= message_frequency:
             await send_image(update, context)
-            
-            message_counts[chat_id] = 0
+            message_counts[chat_id] = 0  # Reset after drop
             
 async def send_image(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
@@ -103,24 +98,33 @@ async def send_image(update: Update, context: CallbackContext) -> None:
     if chat_id not in sent_characters:
         sent_characters[chat_id] = []
 
+    # Reset list if all characters have been sent
     if len(sent_characters[chat_id]) == len(all_characters):
         sent_characters[chat_id] = []
 
-    character = random.choice([c for c in all_characters if c['id'] not in sent_characters[chat_id]])
+    # Choose a random character that hasn't been sent yet
+    available_characters = [c for c in all_characters if c['id'] not in sent_characters[chat_id]]
+    if not available_characters:
+        return  # No characters available to send
 
+    character = random.choice(available_characters)
     sent_characters[chat_id].append(character['id'])
     last_characters[chat_id] = character
 
+    # Reset first correct guess tracking
     if chat_id in first_correct_guesses:
         del first_correct_guesses[chat_id]
 
+    # Send the DBL-themed character drop message
     await context.bot.send_photo(
         chat_id=chat_id,
         photo=character['img_url'],
-        caption=f"""A New {character['rarity']} Character Appeared...\n/guess Character Name and add in Your Harem""",
-        parse_mode='Markdown')
+        caption=f"""🔥 **A New {character['rarity']} Fighter Has Appeared!** 🔥  
+⚡ Be the first to **/collect Character Name** to claim them!""",
+        parse_mode='Markdown'
+    )
 
-
+            
 async def guess(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id

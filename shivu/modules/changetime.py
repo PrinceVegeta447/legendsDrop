@@ -6,11 +6,15 @@ from pyrogram.types import Message
 
 ADMINS = [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
 
-
 @shivuu.on_message(filters.command("set_droptime"))
 async def change_time(client: Client, message: Message):
     user_id = message.from_user.id
     chat_id = message.chat.id
+
+    if message.chat.type == "private":
+        await message.reply_text("🚫 This command only works in groups.")
+        return
+
     member = await shivuu.get_chat_member(chat_id, user_id)
 
     # Allow only admins, sudo users, or bot owner
@@ -21,7 +25,7 @@ async def change_time(client: Client, message: Message):
     try:
         args = message.command
         if len(args) != 2:
-            await message.reply_text("⚠️ **Usage:** `/set_droptime NUMBER`")
+            await message.reply_text("⚠️ **Usage:** `/changetime NUMBER`")
             return
 
         new_frequency = int(args[1])
@@ -31,12 +35,11 @@ async def change_time(client: Client, message: Message):
             await message.reply_text("⚠️ The message frequency must be **100 or higher**.")
             return
 
-        # Update droptime in MongoDB (Ensure chat_id is stored as an integer)
-        await user_totals_collection.find_one_and_update(
-            {'chat_id': chat_id},  
+        # Update droptime in MongoDB
+        await user_totals_collection.update_one(
+            {'chat_id': chat_id},
             {'$set': {'message_frequency': new_frequency}},
-            upsert=True,
-            return_document=ReturnDocument.AFTER
+            upsert=True  # Creates new entry if not exists
         )
 
         await message.reply_text(f"✅ Successfully changed droptime to **{new_frequency} messages**.")

@@ -16,35 +16,40 @@ async def start(update: Update, context: CallbackContext) -> None:
     user_data = await collection.find_one({"_id": user_id})
 
     if user_data is None:
-        
         await collection.insert_one({"_id": user_id, "first_name": first_name, "username": username})
         
-        await context.bot.send_message(chat_id=GROUP_ID, 
-                                       text=f"New user Started The Bot..\n User: <a href='tg://user?id={user_id}'>{escape(first_name)})</a>", 
-                                       parse_mode='HTML')
+        # Announce new users in the support group
+        await context.bot.send_message(
+            chat_id=GROUP_ID, 
+            text=f"🔥 **A New Saiyan Has Joined!** 🔥\n"
+                 f"**User:** <a href='tg://user?id={user_id}'>{escape(first_name)}</a>\n"
+                 f"**Welcome to Dragon Ball Legends!** 🐉⚡",
+            parse_mode='HTML'
+        )
     else:
-        
+        # Update user info if changed
         if user_data['first_name'] != first_name or user_data['username'] != username:
-            
             await collection.update_one({"_id": user_id}, {"$set": {"first_name": first_name, "username": username}})
 
-    
-
-    if update.effective_chat.type== "private":
-        
-        
+    # Private Chat Start Message
+    if update.effective_chat.type == "private":
         caption = f"""
-        ***Heyyyy...***
+🔥 **Welcome, Warrior!** 🔥
 
-***I am An Open Source Character Catcher Bot...​Add Me in Your group.. And I will send Random Characters After.. every 100 messages in Group... Use /guess to.. Collect that Characters in Your Collection.. and see Collection by using /Harem... So add in Your groups and Collect Your harem***
-        """
-        
+I am your **Dragon Ball Legends Collector Bot**! 🐉✨  
+🔹 I will drop random **DBL characters** in group chats.  
+🔹 Use `/collect <character>` to claim them.  
+🔹 See your **collection** with `/fav`.  
+
+💥 **Become the strongest and collect them all!** 💥
+"""
+
         keyboard = [
-            [InlineKeyboardButton("ADD ME", url=f'http://t.me/{BOT_USERNAME}?startgroup=new')],
-            [InlineKeyboardButton("SUPPORT", url=f'https://t.me/{SUPPORT_CHAT}'),
-            InlineKeyboardButton("UPDATES", url=f'https://t.me/{UPDATE_CHAT}')],
-            [InlineKeyboardButton("HELP", callback_data='help')],
-            [InlineKeyboardButton("SOURCE", url=f'https://github.com/MyNameIsShekhar/WAIFU-HUSBANDO-CATCHER')]
+            [InlineKeyboardButton("⚡ ADD ME TO GROUP ⚡", url=f'http://t.me/{BOT_USERNAME}?startgroup=new')],
+            [InlineKeyboardButton("🔹 SUPPORT", url=f'https://t.me/{SUPPORT_CHAT}'),
+            InlineKeyboardButton("🔸 UPDATES", url=f'https://t.me/{UPDATE_CHAT}')],
+            [InlineKeyboardButton("📜 HELP", callback_data='help')],
+            [InlineKeyboardButton("💾 SOURCE CODE", url=f'https://github.com/PrinceVegeta447/legendsDrop')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         photo_url = random.choice(PHOTO_URL)
@@ -54,15 +59,15 @@ async def start(update: Update, context: CallbackContext) -> None:
     else:
         photo_url = random.choice(PHOTO_URL)
         keyboard = [
-            [InlineKeyboardButton("ADD ME", url=f'http://t.me/{BOT_USERNAME}?startgroup=new')],
-            [InlineKeyboardButton("SUPPORT", url=f'https://t.me/{SUPPORT_CHAT}'),
-            InlineKeyboardButton("UPDATES", url=f'https://t.me/{UPDATE_CHAT}')],
-            [InlineKeyboardButton("HELP", callback_data='help')],
-            [InlineKeyboardButton("SOURCE", url=f'https://github.com/MyNameIsShekhar/WAIFU-HUSBANDO-CATCHER')]
+            [InlineKeyboardButton("⚡ ADD ME TO GROUP ⚡", url=f'http://t.me/{BOT_USERNAME}?startgroup=new')],
+            [InlineKeyboardButton("🔹 SUPPORT", url=f'https://t.me/{SUPPORT_CHAT}'),
+            InlineKeyboardButton("🔸 UPDATES", url=f'https://t.me/{UPDATE_CHAT}')],
+            [InlineKeyboardButton("📜 HELP", callback_data='help')],
+            [InlineKeyboardButton("💾 SOURCE CODE", url=f'https://github.com/PrinceVegeta447/legendsDrop')]
         ]
         
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo_url, caption="🎴Alive!?... \n connect to me in PM For more information ",reply_markup=reply_markup )
+        await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo_url, caption="⚡ **Bot Activated!** Send me a private message for details.", reply_markup=reply_markup)
 
 async def button(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
@@ -70,43 +75,42 @@ async def button(update: Update, context: CallbackContext) -> None:
 
     if query.data == 'help':
         help_text = """
-    ***Help Section:***
-    
-***/guess: To Guess character (only works in group)***
-***/fav: Add Your fav***
-***/trade : To trade Characters***
-***/gift: Give any Character from Your Collection to another user.. (only works in groups)***
-***/collection: To see Your Collection***
-***/topgroups : See Top Groups.. Ppl Guesses Most in that Groups***
-***/top: Too See Top Users***
-***/ctop : Your ChatTop***
-***/changetime: Change Character appear time (only works in Groups)***
-   """
-        help_keyboard = [[InlineKeyboardButton("⤾ Bᴀᴄᴋ", callback_data='back')]]
+⚡ **Help Section** ⚡
+
+🔹 `/collect <character>` → Collect a dropped character  
+🔹 `/fav` → View your **favorite** DBL characters  
+🔹 `/trade` → Trade characters with another player  
+🔹 `/gift` → Gift a character to another player  
+🔹 `/collection` → View your **entire collection**  
+🔹 `/topgroups` → View **Top Groups**  
+🔹 `/top` → View **Top Players**  
+🔹 `/changetime` → Change character drop frequency (Admins only)
+"""
+        help_keyboard = [[InlineKeyboardButton("⏪ Back", callback_data='back')]]
         reply_markup = InlineKeyboardMarkup(help_keyboard)
         
         await context.bot.edit_message_caption(chat_id=update.effective_chat.id, message_id=query.message.message_id, caption=help_text, reply_markup=reply_markup, parse_mode='markdown')
 
     elif query.data == 'back':
+        caption = """
+🔥 **Welcome Back, Warrior!** 🔥
 
-        caption = f"""
-        ***Hoyyyy...*** ✨
+💥 I am the **Dragon Ball Legends Collector Bot**! 💥  
+🟢 Add me to a **group**, and I will drop **random characters**!  
+🟢 Use `/collect <character>` to claim them.  
+🟢 Check your **collection** with `/fav`.  
+"""
 
-***I am An Open Source Character Catcher Bot..​Add Me in Your group.. And I will send Random Characters After.. every 100 messages in Group... Use /guess to.. Collect that Characters in Your Collection.. and see Collection by using /Harem... So add in Your groups and Collect Your harem***
-        """
-
-        
         keyboard = [
-            [InlineKeyboardButton("ADD ME", url=f'http://t.me/{BOT_USERNAME}?startgroup=new')],
-            [InlineKeyboardButton("SUPPORT", url=f'https://t.me/{SUPPORT_CHAT}'),
-            InlineKeyboardButton("UPDATES", url=f'https://t.me/{UPDATE_CHAT}')],
-            [InlineKeyboardButton("HELP", callback_data='help')],
-            [InlineKeyboardButton("SOURCE", url=f'https://github.com/MyNameIsShekhar/WAIFU-HUSBANDO-CATCHER')]
+            [InlineKeyboardButton("⚡ ADD ME TO GROUP ⚡", url=f'http://t.me/{BOT_USERNAME}?startgroup=new')],
+            [InlineKeyboardButton("🔹 SUPPORT", url=f'https://t.me/{SUPPORT_CHAT}'),
+            InlineKeyboardButton("🔸 UPDATES", url=f'https://t.me/{UPDATE_CHAT}')],
+            [InlineKeyboardButton("📜 HELP", callback_data='help')],
+            [InlineKeyboardButton("💾 SOURCE CODE", url=f'https://github.com/PrinceVegeta447/legendsDrop')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await context.bot.edit_message_caption(chat_id=update.effective_chat.id, message_id=query.message.message_id, caption=caption, reply_markup=reply_markup, parse_mode='markdown')
-
 
 application.add_handler(CallbackQueryHandler(button, pattern='^help$|^back$', block=False))
 start_handler = CommandHandler('start', start, block=False)

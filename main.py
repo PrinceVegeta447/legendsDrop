@@ -247,14 +247,18 @@ async def fav(update: Update, context: CallbackContext) -> None:
 def main() -> None:
     """Run bot."""
 
+    # Add command handlers
     application.add_handler(CommandHandler(["guess", "protecc", "collect", "grab", "hunt"], guess, block=False))
     application.add_handler(CommandHandler("fav", fav, block=False))
     application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
 
+    # Start polling for Telegram bot commands
     application.run_polling(drop_pending_updates=True)
-    
-if __name__ == "__main__":
-    shivuu.start()
-    LOGGER.info("Bot started")
-    main()
 
+if __name__ == "__main__":
+    LOGGER.info("Starting Pyrogram Client...")
+    shivuu.start()  # Ensure Pyrogram client starts correctly
+    LOGGER.info("Pyrogram Client started successfully!")
+
+    LOGGER.info("Starting Telegram Bot...")
+    main()  # Now start the Telegram bot

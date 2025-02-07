@@ -31,9 +31,9 @@ async def change_time(client: Client, message: Message):
             await message.reply_text("The message frequency must be **100 or higher**.")
             return
 
-        # Update droptime in MongoDB
+        # Update droptime in MongoDB (Ensure chat_id is stored as an integer)
         chat_frequency = await user_totals_collection.find_one_and_update(
-            {'chat_id': str(chat_id)},
+            {'chat_id': chat_id},  # Keep chat_id as integer
             {'$set': {'message_frequency': new_frequency}},
             upsert=True,
             return_document=ReturnDocument.AFTER

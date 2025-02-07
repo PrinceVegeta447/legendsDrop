@@ -4,6 +4,8 @@ import random
 import re
 import asyncio
 from html import escape 
+from flask import Flask
+import threading
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
@@ -13,7 +15,8 @@ from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filter
 from shivu import collection, top_global_groups_collection, group_user_totals_collection, user_collection, user_totals_collection, shivuu
 from shivu import application, SUPPORT_CHAT, UPDATE_CHAT, db, LOGGER
 from shivu.modules import ALL_MODULES
-from flask import Flask
+
+
 
 app = Flask(__name__)
 
@@ -21,10 +24,14 @@ app = Flask(__name__)
 def health_check():
     return "OK", 200
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+def run_health_check():
+    app.run(host="0.0.0.0", port=8000, debug=False, use_reloader=False)
 
+if __name__ == "__main__":
+    # Start Flask health check in a separate thread
+    threading.Thread(target=run_health_check, daemon=True).start()
 
+   
 locks = {}
 message_counters = {}
 spam_counters = {}

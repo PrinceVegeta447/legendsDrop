@@ -1,1 +1,1 @@
-web: python shivu/_main_.py
+web: python main.py

@@ -20,7 +20,7 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
             await update.callback_query.edit_message_text('You Have Not Guessed any Characters Yet..')
         return
 
-    characters = sorted(user['characters'], key=lambda x: (x['anime'], x['id']))
+    characters = sorted(user['characters'], key=lambda x: (x['game'], x['id']))
 
     character_counts = {k: len(list(v)) for k, v in groupby(characters, key=lambda x: x['id'])}
 
@@ -39,10 +39,10 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
     current_characters = unique_characters[page*15:(page+1)*15]
 
     
-    current_grouped_characters = {k: list(v) for k, v in groupby(current_characters, key=lambda x: x['anime'])}
+    current_grouped_characters = {k: list(v) for k, v in groupby(current_characters, key=lambda x: x['game'])}
 
-    for anime, characters in current_grouped_characters.items():
-        harem_message += f'\n<b>{anime} {len(characters)}/{await collection.count_documents({"anime": anime})}</b>\n'
+    for game, characters in current_grouped_characters.items():
+        harem_message += f'\n<b>{game} {len(characters)}/{await collection.count_documents({"game": game})}</b>\n'
 
         for character in characters:
             

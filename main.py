@@ -88,7 +88,8 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
         # Drop a DBL character when message count reaches droptime
         if message_counts[chat_id] >= message_frequency:
             await send_image(update, context)
-            message_counts[chat_id] = 0  # Reset after drop
+            message_counts[chat_id] = 0 
+            print(f"🔍 [DEBUG] Group: {chat_id} | Message Count: {message_counts[chat_id]} | Drop Frequency: {message_frequency}")# Reset after drop
             
 async def send_image(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
@@ -114,6 +115,7 @@ async def send_image(update: Update, context: CallbackContext) -> None:
     # Reset first correct guess tracking
     if chat_id in first_correct_guesses:
         del first_correct_guesses[chat_id]
+    print(f"🟢 [DEBUG] Dropping Character in {chat_id} | Total Characters: {len(all_characters)}")
 
     # Send the DBL-themed character drop message
     await context.bot.send_photo(

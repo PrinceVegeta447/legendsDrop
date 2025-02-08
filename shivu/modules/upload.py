@@ -117,7 +117,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
             "12": "⚡ Super Saiyan",
             "13": "❤️‍🔥 Dragon Ball Saga",
             "14": "💫 Majin Buu Saga",
-            "15"; "👾 Cell Saga"
+            "15": "👾 Cell Saga"
         }
         category = category_map.get(category_input)
         if not category:

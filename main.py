@@ -137,22 +137,25 @@ REWARD_TABLE = {
 }
 
 
-
 async def guess(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
 
+    # ✅ Check if a character has been dropped
     if chat_id not in last_characters:
         await update.message.reply_text("❌ No character has been dropped yet!")
         return
 
-    # ✅ Fetch last dropped character details
     dropped_character = last_characters[chat_id]
-    character_name = dropped_character["name"]
-    character_rarity = dropped_character.get("rarity", "Common")  # ✅ Ensure rarity is retrieved
+    character_name = dropped_character["name"].lower()
+    character_rarity = dropped_character.get("rarity", "Common")
+
+    # ✅ Reset tracking when a new character appears
+    if chat_id not in first_correct_guesses or first_correct_guesses[chat_id] != dropped_character['id']:
+        first_correct_guesses[chat_id] = None  
 
     # ✅ Check if the character has already been guessed
-    if chat_id in first_correct_guesses and first_correct_guesses[chat_id] is not None:
+    if first_correct_guesses[chat_id] is not None:
         await update.message.reply_text("❌ This character has already been guessed!")
         return
 
@@ -162,12 +165,12 @@ async def guess(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ Please provide a character name.")
         return
 
-    if "()" in guess_text or "&" in guess_text.lower():
+    if "()" in guess_text or "&" in guess_text:
         await update.message.reply_text("❌ Invalid characters in guess.")
         return
 
-    name_parts = character_name.lower().split()
-
+    # ✅ Check if the guessed name matches
+    name_parts = character_name.split()
     if sorted(name_parts) == sorted(guess_text.split()) or any(part == guess_text for part in name_parts):
         first_correct_guesses[chat_id] = dropped_character['id']  # ✅ Mark character as guessed
 
@@ -204,30 +207,20 @@ async def guess(update: Update, context: CallbackContext) -> None:
             })
 
         # ✅ Update group user stats
-        group_user_total = await group_user_totals_collection.find_one({'user_id': user_id, 'group_id': chat_id})
-        if group_user_total:
-            await group_user_totals_collection.update_one({'user_id': user_id, 'group_id': chat_id}, {'$inc': {'count': 1}})
-        else:
-            await group_user_totals_collection.insert_one({
-                'user_id': user_id,
-                'group_id': chat_id,
-                'username': update.effective_user.username,
-                'first_name': update.effective_user.first_name,
-                'count': 1
-            })
+        await group_user_totals_collection.update_one(
+            {'user_id': user_id, 'group_id': chat_id},
+            {'$inc': {'count': 1}},
+            upsert=True
+        )
 
         # ✅ Update top global groups
-        group_info = await top_global_groups_collection.find_one({'group_id': chat_id})
-        if group_info:
-            await top_global_groups_collection.update_one({'group_id': chat_id}, {'$inc': {'count': 1}})
-        else:
-            await top_global_groups_collection.insert_one({
-                'group_id': chat_id,
-                'group_name': update.effective_chat.title,
-                'count': 1
-            })
+        await top_global_groups_collection.update_one(
+            {'group_id': chat_id},
+            {'$inc': {'count': 1}},
+            upsert=True
+        )
 
-        # ✅ Create response message
+        # ✅ Send success message
         keyboard = [[InlineKeyboardButton("See Collection", switch_inline_query_current_chat=f"collection.{user_id}")]]
         await update.message.reply_text(
             f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> You guessed a new character! ✅️\n\n'
@@ -244,6 +237,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
 
     else:
         await update.message.reply_text("❌ Incorrect character name. Try again!")
+
 
   
 

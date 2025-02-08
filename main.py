@@ -117,7 +117,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
     if chat_id not in last_characters:
         return
 
-    if chat_id in first_correct_guesses:
+    if chat_id in first_correct_guesses and first_correct_guesses[chat_id] == last_characters[chat_id]["id"]:
         await update.message.reply_text(f'❌️ Already Guessed By Someone.. Try Next Time Bruhh ')
         return
 

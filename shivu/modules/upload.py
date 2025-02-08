@@ -39,6 +39,7 @@ Example:
 14. Majin Buu Saga
 15. Cell Saga
 16. Sagas From the Movies
+17. Lineage Of Evil
 """
 
 # ✅ Function to generate a unique character ID
@@ -119,7 +120,8 @@ async def upload(update: Update, context: CallbackContext) -> None:
             "13": "❤️‍🔥 Dragon Ball Saga",
             "14": "💫 Majin Buu Saga",
             "15": "👾 Cell Saga",
-            "16": "📽️ Sagas From the Movies"
+            "16": "📽️ Sagas From the Movies",
+            "17": "☠️ Lineage Of Evil"
         }
         category = category_map.get(category_input)
         if not category:

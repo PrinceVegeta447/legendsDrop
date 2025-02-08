@@ -63,7 +63,10 @@ async def upload(update: Update, context: CallbackContext) -> None:
         image_url = args[0]  
         rarity_input = args[-2]  # Second-last argument is rarity
         category_input = args[-1]  # Last argument is category
-        character_name = ' '.join(args[1:-2]).replace('-', ' ').title()  # Everything in between is the name
+        character_name = ' '.join(args[1:-2])  # Everything in between is the name
+
+        # ✅ Handle special characters like `&`
+        character_name = character_name.replace("&", " & ").replace("-", " ").title()
 
         # ✅ Validate image URL
         try:
@@ -74,9 +77,10 @@ async def upload(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text("❌ Invalid Image URL. Please provide a working link.")
             return
 
+        # ✅ Proceed with uploading to the database...
+
     except Exception as e:
         await update.message.reply_text(f"❌ Upload failed! Error: {str(e)}")
-
         # ✅ Define DBL rarity levels
         rarity_map = {
             "1": "⚪ Common",

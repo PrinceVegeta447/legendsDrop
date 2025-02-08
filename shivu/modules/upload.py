@@ -32,6 +32,8 @@ Example:
 7️⃣ Regeneration  
 8️⃣ Fusion Warrior
 9️⃣ Duo
+🔟 Super Saiyan God SS
+11. Ultra Instinct Sign
 """
 
 # ✅ Function to generate a unique character ID
@@ -105,7 +107,9 @@ async def upload(update: Update, context: CallbackContext) -> None:
             "6": "💪 Super Warrior",
             "7": "🩸 Regeneration",
             "8": "🔀 Fusion Warrior",
-            "9": "🤝 Duo"
+            "9": "🤝 Duo",
+            "10": "🔱 Super Saiyan God SS",
+            "11": "🗿 Ultra Instinct Sign"
         }
         category = category_map.get(category_input)
         if not category:

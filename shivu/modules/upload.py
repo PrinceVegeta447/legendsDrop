@@ -55,10 +55,9 @@ async def upload(update: Update, context: CallbackContext) -> None:
         return
 
     try:
-        # Debugging log
-        print(f"📥 [DEBUG] Upload Command Received - Args: {context.args}")
-
         args = context.args
+        print(f"📥 [DEBUG] Upload Command Received - Args: {args}")  # Log received arguments
+
         if len(args) < 4:  # Ensure at least 4 arguments exist
             await update.message.reply_text(WRONG_FORMAT_TEXT)
             return
@@ -66,25 +65,19 @@ async def upload(update: Update, context: CallbackContext) -> None:
         image_url = args[0]  
         rarity_input = args[-2]  # Second-last argument is rarity
         category_input = args[-1]  # Last argument is category
-
-        # **Fix: Extract Multi-word Character Names**
-        character_name = ' '.join(args[1:-2]).replace("&", " & ").replace("-", " ").title()
+        character_name = ' '.join(args[1:-2]).replace('-', ' ').title()  # Everything in between is the name
 
         print(f"🎯 [DEBUG] Parsed Data - Image: {image_url}, Name: {character_name}, Rarity: {rarity_input}, Category: {category_input}")
 
-        # ✅ Validate Image URL
+        # ✅ Validate image URL (Check if it's a valid direct image)
         try:
             response = requests.get(image_url, timeout=5)
             if response.status_code != 200:
                 raise ValueError("Invalid Image URL")
-        except Exception:
-            await update.message.reply_text("❌ Invalid Image URL. Please provide a working link.")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Invalid Image URL. Error: {str(e)}\nTry using a direct link ending with .jpg or .png.")
             return
 
-        # ✅ Proceed with database insertion...
-
-    except Exception as e:
-        await update.message.reply_text(f"❌ Upload failed! Error: {str(e)}")
         # ✅ Define DBL rarity levels
         rarity_map = {
             "1": "⚪ Common",
@@ -116,11 +109,12 @@ async def upload(update: Update, context: CallbackContext) -> None:
         }
         category = category_map.get(category_input)
         if not category:
-            await update.message.reply_text("❌ Invalid Category. Use numbers: 1-8.")
+            await update.message.reply_text("❌ Invalid Category. Use numbers: 1-9.")
             return
 
         # ✅ Generate unique character ID
         char_id = str(await get_next_sequence_number("character_id")).zfill(3)
+        print(f"🔢 [DEBUG] Generated Character ID: {char_id}")
 
         character = {
             'img_url': image_url,
@@ -132,6 +126,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
 
         # ✅ Send the character image to the character channel
         try:
+            print(f"📤 [DEBUG] Sending Image to Character Channel {CHARA_CHANNEL_ID}...")
             message = await context.bot.send_photo(
                 chat_id=CHARA_CHANNEL_ID,
                 photo=image_url,
@@ -145,11 +140,15 @@ async def upload(update: Update, context: CallbackContext) -> None:
             )
             character["message_id"] = message.message_id
             await collection.insert_one(character)
+            print(f"✅ [DEBUG] Character Added Successfully!")
             await update.message.reply_text(f"✅ `{character_name}` successfully added!")
+
         except Exception as e:
+            print(f"❌ [ERROR] Failed to Send Image: {str(e)}")
             await update.message.reply_text(f"⚠️ Character added, but couldn't send image. Error: {str(e)}")
 
     except Exception as e:
+        print(f"❌ [ERROR] Upload Failed: {str(e)}")
         await update.message.reply_text(f"❌ Upload failed! Error: {str(e)}\nContact support: {SUPPORT_CHAT}")
 
 # ✅ Function to delete a character

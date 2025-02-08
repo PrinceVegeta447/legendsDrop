@@ -37,6 +37,7 @@ Example:
 12. Super Saiyan 
 13. Dragon Ball Saga
 14. Majin Buu Saga
+15. Cell Saga
 """
 
 # ✅ Function to generate a unique character ID
@@ -115,7 +116,8 @@ async def upload(update: Update, context: CallbackContext) -> None:
             "11": "🗿 Ultra Instinct Sign",
             "12": "⚡ Super Saiyan",
             "13": "❤️‍🔥 Dragon Ball Saga",
-            "14": "💫 Majin Buu Saga"
+            "14": "💫 Majin Buu Saga",
+            "15"; "👾 Cell Saga"
         }
         category = category_map.get(category_input)
         if not category:

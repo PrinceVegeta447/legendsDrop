@@ -56,12 +56,14 @@ async def upload(update: Update, context: CallbackContext) -> None:
 
     try:
         args = context.args
-        if len(args) != 4:
-            await update.message.reply_text(WRONG_FORMAT_TEXT)
-            return
+    if len(args) < 4:  # Ensure at least 4 arguments exist
+       await update.message.reply_text(WRONG_FORMAT_TEXT)
+       return
 
-        image_url, character_name, rarity_input, category_input = args[0], args[1].replace('-', ' ').title(), args[2], args[3]
-
+image_url = args[0]  
+rarity_input = args[-2]  # Second-last argument is rarity
+category_input = args[-1]  # Last argument is category
+character_name = ' '.join(args[1:-2]).replace('-', ' ').title()  # Everything in between is the namep
         # ✅ Validate image URL
         try:
             response = requests.get(image_url, timeout=5)

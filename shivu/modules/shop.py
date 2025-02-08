@@ -1,82 +1,90 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
+from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler, MessageHandler, filters
 from shivu import application, user_collection
 
-# ✅ Prices
-SHOP_ITEMS = {
-    "cc_100": {"name": "💎 100 Chrono Crystals", "cost": 50000, "currency": "coins", "gives": {"chrono_crystals": 100}},
-    "cc_500": {"name": "💎 500 Chrono Crystals", "cost": 220000, "currency": "coins", "gives": {"chrono_crystals": 500}},
-    "ticket_1": {"name": "🎟 1 Summon Ticket", "cost": 220, "currency": "chrono_crystals", "gives": {"summon_tickets": 1}},
-    "ticket_5": {"name": "🎟 5 Summon Tickets", "cost": 1100, "currency": "chrono_crystals", "gives": {"summon_tickets": 5}},
-}
+# Prices
+CC_PRICE = 500  # 50 Zeni per CC
+TICKET_PRICE = 1000  # 1000 Zeni per Summon Ticket
 
-# ✅ Shop Command
+# Dictionary to track purchase requests
+pending_purchases = {}
+
 async def shop(update: Update, context: CallbackContext) -> None:
-    """Displays the shop with available items."""
-    shop_text = "🛒 **Welcome to the Shop!**\n\nUse /buy `<item> <amount>` to purchase.\n\n"
-    
-    for key, item in SHOP_ITEMS.items():
-        shop_text += f"{item['name']} - {item['cost']} {item['currency'].capitalize()}\n"
-    
-    # Inline Buttons
-    buttons = [
-        [InlineKeyboardButton("💎 Buy CC", callback_data="shop:cc"), InlineKeyboardButton("🎟 Buy Tickets", callback_data="shop:tickets")],
-    ]
-    reply_markup = InlineKeyboardMarkup(buttons)
-
-    await update.message.reply_text(shop_text, parse_mode="Markdown", reply_markup=reply_markup)
-
-# ✅ Buy Command
-async def buy(update: Update, context: CallbackContext) -> None:
-    """Processes item purchases."""
+    """Display the shop menu with inline buttons."""
     user_id = update.effective_user.id
     user = await user_collection.find_one({'id': user_id})
 
     if not user:
-        await update.message.reply_text("😔 You don't have an inventory yet. Start collecting characters first!")
+        await update.message.reply_text("😔 You have no Zeni! Earn some by guessing characters.")
         return
 
-    # ✅ Parse user input
-    args = context.args
-    if len(args) != 2:
-        await update.message.reply_text("❌ Incorrect format!\nUse: `/buy <item> <amount>`\nExample: `/buy cc_100 2`")
-        return
+    coins = user.get('coins', 0)
+    chrono_crystals = user.get('chrono_crystals', 0)
+    summon_tickets = user.get('summon_tickets', 0)
 
-    item_key, amount = args[0], args[1]
+    # Shop message
+    shop_message = (
+        f"🛒 **Welcome to the Shop!**\n\n"
+        f"💰 **Your Zeni:** `{coins}`\n"
+        f"💎 **Chrono Crystals:** `{chrono_crystals}`\n"
+        f"🎟 **Summon Tickets:** `{summon_tickets}`\n\n"
+        f"🔽 **Available Items:** 🔽"
+    )
 
-    if item_key not in SHOP_ITEMS:
-        await update.message.reply_text("❌ Invalid item! Use `/shop` to view available items.")
-        return
+    # Inline buttons
+    keyboard = [
+        [InlineKeyboardButton("💎 Buy Chrono Crystals", callback_data="buy_cc")],
+        [InlineKeyboardButton("🎟 Buy Summon Tickets", callback_data="buy_ticket")]
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(shop_message, parse_mode="Markdown", reply_markup=reply_markup)
+
+async def request_amount(update: Update, context: CallbackContext) -> None:
+    """Prompt the user to enter an amount after clicking a button."""
+    query = update.callback_query
+    user_id = query.from_user.id
+
+    pending_purchases[user_id] = query.data  # Store purchase type (buy_cc or buy_ticket)
+    await query.message.reply_text("🛍 Enter the amount you want to buy:")
+
+async def process_purchase(update: Update, context: CallbackContext) -> None:
+    """Process the purchase after user enters an amount."""
+    user_id = update.effective_user.id
+    user = await user_collection.find_one({'id': user_id})
+
+    if user_id not in pending_purchases:
+        return  # Ignore messages not related to purchase
+
+    purchase_type = pending_purchases.pop(user_id)  # Retrieve purchase type
+    coins = user.get('coins', 0)
 
     try:
-        amount = int(amount)
-        if amount < 1:
-            raise ValueError
+        amount = int(update.message.text)
+        if amount <= 0:
+            await update.message.reply_text("❌ Invalid amount! Please enter a number greater than 0.")
+            return
     except ValueError:
-        await update.message.reply_text("❌ Amount must be a **valid number** greater than 0.")
+        await update.message.reply_text("❌ Invalid input! Please enter a valid number.")
         return
 
-    item = SHOP_ITEMS[item_key]
-    total_cost = item["cost"] * amount
-    currency = item["currency"]
+    if purchase_type == "buy_cc":
+        total_cost = amount * CC_PRICE
+        if coins < total_cost:
+            await update.message.reply_text(f"❌ Not enough Zeni! You need {total_cost} Zeni for {amount} CC.")
+            return
+        await user_collection.update_one({'id': user_id}, {'$inc': {'coins': -total_cost, 'chrono_crystals': amount}})
+        await update.message.reply_text(f"✅ Purchased {amount} Chrono Crystals for {total_cost} Zeni!")
 
-    # ✅ Check if user has enough currency
-    if user.get(currency, 0) < total_cost:
-        await update.message.reply_text(f"❌ Not enough {currency}! You need **{total_cost} {currency}**.")
-        return
+    elif purchase_type == "buy_ticket":
+        total_cost = amount * TICKET_PRICE
+        if coins < total_cost:
+            await update.message.reply_text(f"❌ Not enough Zeni! You need {total_cost} Zeni for {amount} Summon Tickets.")
+            return
+        await user_collection.update_one({'id': user_id}, {'$inc': {'coins': -total_cost, 'summon_tickets': amount}})
+        await update.message.reply_text(f"✅ Purchased {amount} Summon Tickets for {total_cost} Zeni!")
 
-    # ✅ Deduct cost & Add items to inventory
-    update_data = {
-        "$inc": {currency: -total_cost}  # Deduct cost
-    }
-    for key, value in item["gives"].items():
-        update_data["$inc"][key] = value * amount  # Add items
-
-    await user_collection.update_one({'id': user_id}, update_data)
-
-    # ✅ Confirmation message
-    await update.message.reply_text(f"✅ Purchased {amount}x {item['name']}!\n\n💰 **Remaining {currency.capitalize()}:** {user.get(currency, 0) - total_cost}")
-
-# ✅ Handlers
+# Handlers
 application.add_handler(CommandHandler("shop", shop, block=False))
-application.add_handler(CommandHandler("buy", buy, block=False))
+application.add_handler(CallbackQueryHandler(request_amount, pattern="^buy_", block=False))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_purchase))

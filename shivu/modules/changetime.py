@@ -50,7 +50,7 @@ async def view_droptime(client: Client, message: Message):
     try:
         # Fetch the current droptime for this group
         chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
-        message_frequency = chat_frequency.get('message_frequency', 5) if chat_frequency else 5
+        message_frequency = chat_frequency.get('message_frequency', 100) if chat_frequency else 100
 
         await message.reply_text(f"📊 **Current Droptime:** `{message_frequency} messages`")
     except Exception as e:

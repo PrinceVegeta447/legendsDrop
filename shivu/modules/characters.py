@@ -5,11 +5,9 @@ from shivu import application, collection
 # ✅ Number of characters per page
 CHARACTERS_PER_PAGE = 10
 
-async def list_characters(update: Update, context: CallbackContext) -> None:
+async def list_characters(update: Update, context: CallbackContext, page=1) -> None:
     """Command to list characters from the database (Paginated)"""
-    page = int(context.args[0]) if context.args and context.args[0].isdigit() else 1
-
-    # ✅ Count total characters
+    
     total_characters = await collection.count_documents({})
     total_pages = (total_characters // CHARACTERS_PER_PAGE) + (1 if total_characters % CHARACTERS_PER_PAGE else 0)
 
@@ -28,26 +26,30 @@ async def list_characters(update: Update, context: CallbackContext) -> None:
     # ✅ Format message
     message = f"📜 **Character List (Page {page}/{total_pages})**\n\n"
     for char in characters:
-        message += f"🆔 `{char['id']}` | **{char['name']}**\n🎖️ {char['rarity']} | 🔹 {char['category']}\n\n"
+        message += f"🆔 `{char['id']}` | **{char['name']}**\n🎖️ {char['rarity']} | 🔹 **{char['category']}**\n\n"
 
     # ✅ Pagination buttons
     buttons = []
     if page > 1:
-        buttons.append(InlineKeyboardButton("⬅️", callback_data=f"characters:{page-1}"))
+        buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"characters:{page-1}"))
     if page < total_pages:
-        buttons.append(InlineKeyboardButton("➡️", callback_data=f"characters:{page+1}"))
+        buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"characters:{page+1}"))
 
     reply_markup = InlineKeyboardMarkup([buttons] if buttons else [])
 
-    await update.message.reply_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+    if update.message:
+        await update.message.reply_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+    else:
+        await update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
 
 async def paginate_characters(update: Update, context: CallbackContext) -> None:
-    """Handles pagination for character list"""
+    """Handles inline button pagination"""
     query = update.callback_query
     _, page = query.data.split(":")
     page = int(page)
 
-    await list_characters(update, context)
+    await list_characters(update, context, page)
+    await query.answer()
 
 # ✅ Add command handlers
 application.add_handler(CommandHandler("characters", list_characters, block=False))

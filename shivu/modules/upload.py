@@ -30,7 +30,8 @@ Example:
 5️⃣ God Ki  
 6️⃣ Super Warrior  
 7️⃣ Regeneration  
-8️⃣ Fusion Warrior  
+8️⃣ Fusion Warrior
+9️⃣ Duo
 """
 
 # ✅ Function to generate a unique character ID
@@ -77,7 +78,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
             "3": "🔵 Rare",
             "4": "🟣 Extreme",
             "5": "🟡 Sparking",
-            "6": "🟠 Ultra",
+            "6": "🔱 Ultra",
             "7": "💠 Legends Limited",
             "8": "🔮 Zenkai",
             "9": "🏆 Event-Exclusive"
@@ -96,7 +97,8 @@ async def upload(update: Update, context: CallbackContext) -> None:
             "5": "✨ God Ki",
             "6": "💪 Super Warrior",
             "7": "🩸 Regeneration",
-            "8": "🔀 Fusion Warrior"
+            "8": "🔀 Fusion Warrior",
+            "9": "🤝 Duo"
         }
         category = category_map.get(category_input)
         if not category:

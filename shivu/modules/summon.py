@@ -1,10 +1,16 @@
 import random
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import CommandHandler, CallbackContext
 from shivu import application, collection, user_collection
 
 SUMMON_COST = 60  # Cost per summon in Chrono Crystals
 MAX_SUMMONS = 10  # Maximum characters a user can summon at once
+
+RARITY_ORDER = [
+    "⚪ Common", "🟢 Uncommon", "🔵 Rare", "🟣 Extreme",
+    "🟡 Sparking", "🔱 Ultra", "💠 Legends Limited",
+    "🔮 Zenkai", "🏆 Event-Exclusive"
+]  # Defines rarity order for sorting
 
 async def summon(update: Update, context: CallbackContext) -> None:
     """Allows users to summon characters using Chrono Crystals."""
@@ -42,24 +48,24 @@ async def summon(update: Update, context: CallbackContext) -> None:
     # ✅ Add summoned characters to user's collection
     await user_collection.update_one({'id': user_id}, {'$push': {'characters': {'$each': summoned_characters}}})
 
-    # ✅ Display the summoned characters
-    summon_results = "🎉 **Summon Results** 🎉\n"
-    summon_images = []
+    # ✅ Identify the **rarest** character from the summons
+    rarest_character = max(summoned_characters, key=lambda char: RARITY_ORDER.index(char['rarity']))
 
+    # ✅ Create the summon results message
+    summon_results = "🎉 **Summon Results** 🎉\n"
     for character in summoned_characters:
         summon_results += f"🔹 **{character['name']}** - {character['rarity']} - {character['category']}\n"
-        summon_images.append(character['img_url'])
 
     keyboard = [[InlineKeyboardButton("📜 View Collection", switch_inline_query_current_chat=f"collection.{user_id}")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # ✅ Send results (single or multiple images)
-    if len(summon_images) == 1:
-        await update.message.reply_photo(photo=summon_images[0], caption=summon_results, parse_mode="Markdown", reply_markup=reply_markup)
-    else:
-        media_group = [telegram.InputMediaPhoto(photo, caption=summon_results if i == 0 else "") for i, photo in enumerate(summon_images)]
-        await context.bot.send_media_group(chat_id=update.effective_chat.id, media=media_group)
-        await update.message.reply_text(summon_results, parse_mode="Markdown", reply_markup=reply_markup)
+    # ✅ Send the rarest character's image & results
+    await update.message.reply_photo(
+        photo=rarest_character['img_url'],
+        caption=summon_results,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
 
 # ✅ Add the command handler
 application.add_handler(CommandHandler("summon", summon, block=False))

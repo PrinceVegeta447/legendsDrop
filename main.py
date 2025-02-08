@@ -141,25 +141,27 @@ async def guess(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
     if chat_id not in last_characters:
+        await update.message.reply_text("❌ No character has been dropped yet!")
         return
 
-    if chat_id in first_correct_guesses:
-        await update.message.reply_text(f'❌ Already guessed by someone. Try next time!')
+    # ✅ Reset previous guesses when a new character appears
+    if chat_id not in first_correct_guesses or first_correct_guesses[chat_id] != last_characters[chat_id]['id']:
+        first_correct_guesses[chat_id] = None  # Reset guess tracking
+
+    if first_correct_guesses[chat_id]:
+        await update.message.reply_text("❌ This character has already been guessed!")
         return
 
     guess = ' '.join(context.args).lower() if context.args else ''
-
+    
     if "()" in guess or "&" in guess.lower():
-        await update.message.reply_text("❌ Invalid guess format.")
+        await update.message.reply_text("❌ Invalid characters in guess.")
         return
 
     name_parts = last_characters[chat_id]['name'].lower().split()
-
+    
     if sorted(name_parts) == sorted(guess.split()) or any(part == guess for part in name_parts):
-
-        first_correct_guesses[chat_id] = user_id
-        character_data = last_characters[chat_id]
-        character_rarity = character_data["rarity"]
+        first_correct_guesses[chat_id] = last_characters[chat_id]['id']  # ✅ Mark character as guessed ln
 
         # Assign rewards based on rarity
         if character_rarity in REWARD_TABLE:

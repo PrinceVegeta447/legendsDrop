@@ -52,26 +52,38 @@ def escape_markdown(text):
     return re.sub(r'([%s])' % re.escape(escape_chars), r'\\\1', text)
 
 
+
+import asyncio
+
+# Lock system to prevent race conditions in high-traffic groups
+locks = {}
+
 async def message_counter(update: Update, context: CallbackContext) -> None:
     chat_id = str(update.effective_chat.id)
     user_id = update.effective_user.id
 
-    # ✅ Always fetch the latest droptime from MongoDB
-    chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
-    message_frequency = chat_frequency["message_frequency"] if chat_frequency else 100
+    # Initialize lock for group if not present
+    if chat_id not in locks:
+        locks[chat_id] = asyncio.Lock()
+    lock = locks[chat_id]
 
-    # ✅ Log the correct droptime (AFTER fetching from DB)
-    print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {message_counts.get(chat_id, 0)} | Drop at: {message_frequency}")
+    async with lock:
+        # ✅ Fetch the latest droptime from MongoDB
+        chat_data = await user_totals_collection.find_one({'chat_id': chat_id})
+        message_frequency = chat_data.get("message_frequency", 100) if chat_data else 100
 
-    # ✅ Count messages per group
-    message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
+        # ✅ Debugging log (AFTER fetching from DB)
+        current_count = message_counts.get(chat_id, 0)
+        print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {current_count} | Drop at: {message_frequency}")
 
-    # ✅ If message count reaches the threshold, drop a character
-    if message_counts[chat_id] >= message_frequency:
-        print(f"🟢 [DEBUG] Triggering send_image() in {chat_id}")
-        await send_image(update, context)
-        message_counts[chat_id] = 0  # Reset counter
+        # ✅ Count messages for this group
+        message_counts[chat_id] = current_count + 1
 
+        # ✅ If message count reaches the threshold, drop a character
+        if message_counts[chat_id] >= message_frequency:
+            print(f"🟢 [DEBUG] Triggering send_image() in {chat_id}")
+            await send_image(update, context)
+            message_counts[chat_id] = 0  # Reset counter
 
 
 

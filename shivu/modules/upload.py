@@ -23,17 +23,18 @@ Example:
 9️⃣ Event-Exclusive  
 
 🔹 **Category Guide:**  
-1️⃣ Saiyan  
-2️⃣ Hybrid Saiyan  
-3️⃣ Android  
-4️⃣ Frieza Force  
-5️⃣ God Ki  
-6️⃣ Super Warrior  
-7️⃣ Regeneration  
-8️⃣ Fusion Warrior
-9️⃣ Duo
-🔟 Super Saiyan God SS
+1. Saiyan  
+2. Hybrid Saiyan  
+3. Android  
+4. Frieza Force  
+5. God Ki  
+6. Super Warrior  
+7. Regeneration  
+8. Fusion Warrior
+9. Duo
+10. Super Saiyan God SS
 11. Ultra Instinct Sign
+12. Super Saiyan 
 """
 
 # ✅ Function to generate a unique character ID

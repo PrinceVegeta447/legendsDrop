@@ -122,6 +122,20 @@ async def send_image(update: Update, context: CallbackContext) -> None:
         parse_mode='Markdown'
     )
             
+
+# Define rewards based on rarity
+REWARD_TABLE = {
+    "⚪ Common": (100, 150, 1, 3),
+    "🟢 Uncommon": (150, 250, 2, 5),
+    "🔵 Rare": (200, 350, 3, 7),
+    "🟣 Extreme": (300, 450, 5, 10),
+    "🟡 Sparking": (400, 600, 7, 12),
+    "🔱 Ultra": (500, 800, 10, 15),
+    "💠 Legends Limited": (750, 1200, 15, 20),
+    "🔮 Zenkai": (800, 1300, 20, 25),
+    "🏆 Event-Exclusive": (1000, 1500, 25, 30)
+}
+
 async def guess(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
@@ -129,24 +143,34 @@ async def guess(update: Update, context: CallbackContext) -> None:
     if chat_id not in last_characters:
         return
 
-    if chat_id in first_correct_guesses and first_correct_guesses[chat_id] == last_characters[chat_id]["id"]:
-        await update.message.reply_text(f'❌️ Already Guessed By Someone.. Try Next Time Bruhh ')
+    if chat_id in first_correct_guesses:
+        await update.message.reply_text(f'❌ Already guessed by someone. Try next time!')
         return
 
     guess = ' '.join(context.args).lower() if context.args else ''
-    
-    if "()" in guess or "&" in guess.lower():
-        await update.message.reply_text("Nahh You Can't use This Types of words in your guess..❌️")
-        return
 
+    if "()" in guess or "&" in guess.lower():
+        await update.message.reply_text("❌ Invalid guess format.")
+        return
 
     name_parts = last_characters[chat_id]['name'].lower().split()
 
     if sorted(name_parts) == sorted(guess.split()) or any(part == guess for part in name_parts):
 
-    
         first_correct_guesses[chat_id] = user_id
-        
+        character_data = last_characters[chat_id]
+        character_rarity = character_data["rarity"]
+
+        # Assign rewards based on rarity
+        if character_rarity in REWARD_TABLE:
+            coin_min, coin_max, cc_min, cc_max = REWARD_TABLE[character_rarity]
+            coins_won = random.randint(coin_min, coin_max)
+            chrono_crystals_won = random.randint(cc_min, cc_max)
+        else:
+            coins_won = random.randint(100, 200)  # Default fallback
+            chrono_crystals_won = random.randint(1, 5)
+
+        # Update user collection
         user = await user_collection.find_one({'id': user_id})
         if user:
             update_fields = {}
@@ -156,68 +180,62 @@ async def guess(update: Update, context: CallbackContext) -> None:
                 update_fields['first_name'] = update.effective_user.first_name
             if update_fields:
                 await user_collection.update_one({'id': user_id}, {'$set': update_fields})
-            
-            await user_collection.update_one({'id': user_id}, {'$push': {'characters': last_characters[chat_id]}})
-      
-        elif hasattr(update.effective_user, 'username'):
+
+            await user_collection.update_one({'id': user_id}, {'$push': {'characters': character_data}})
+            await user_collection.update_one({'id': user_id}, {'$inc': {'coins': coins_won, 'chrono_crystals': chrono_crystals_won}})
+        else:
             await user_collection.insert_one({
                 'id': user_id,
                 'username': update.effective_user.username,
                 'first_name': update.effective_user.first_name,
-                'characters': [last_characters[chat_id]],
+                'characters': [character_data],
+                'coins': coins_won,
+                'chrono_crystals': chrono_crystals_won
             })
 
-        
+        # Update group user stats
         group_user_total = await group_user_totals_collection.find_one({'user_id': user_id, 'group_id': chat_id})
         if group_user_total:
-            update_fields = {}
-            if hasattr(update.effective_user, 'username') and update.effective_user.username != group_user_total.get('username'):
-                update_fields['username'] = update.effective_user.username
-            if update.effective_user.first_name != group_user_total.get('first_name'):
-                update_fields['first_name'] = update.effective_user.first_name
-            if update_fields:
-                await group_user_totals_collection.update_one({'user_id': user_id, 'group_id': chat_id}, {'$set': update_fields})
-            
             await group_user_totals_collection.update_one({'user_id': user_id, 'group_id': chat_id}, {'$inc': {'count': 1}})
-      
         else:
             await group_user_totals_collection.insert_one({
                 'user_id': user_id,
                 'group_id': chat_id,
                 'username': update.effective_user.username,
                 'first_name': update.effective_user.first_name,
-                'count': 1,
+                'count': 1
             })
 
-
-    
+        # Update top global groups
         group_info = await top_global_groups_collection.find_one({'group_id': chat_id})
         if group_info:
-            update_fields = {}
-            if update.effective_chat.title != group_info.get('group_name'):
-                update_fields['group_name'] = update.effective_chat.title
-            if update_fields:
-                await top_global_groups_collection.update_one({'group_id': chat_id}, {'$set': update_fields})
-            
             await top_global_groups_collection.update_one({'group_id': chat_id}, {'$inc': {'count': 1}})
-      
         else:
             await top_global_groups_collection.insert_one({
                 'group_id': chat_id,
                 'group_name': update.effective_chat.title,
-                'count': 1,
+                'count': 1
             })
 
-
-        
+        # Create response message
         keyboard = [[InlineKeyboardButton(f"See Collection", switch_inline_query_current_chat=f"collection.{user_id}")]]
-
-
-        await update.message.reply_text(f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> You Guessed a New Character ✅️ \n\n𝗡𝗔𝗠𝗘: <b>{last_characters[chat_id]["name"]}</b> \n𝗖𝗮𝘁𝗲𝗴𝗼𝗿𝘆: <b>{last_characters[chat_id]["category"]}</b> \n𝗥𝗔𝗜𝗥𝗧𝗬: <b>{last_characters[chat_id]["rarity"]}</b>\n\nThis Character has been added to Your collection use /collection To see your Collection', parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text(
+            f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> You guessed a new character! ✅️\n\n'
+            f'🆔 **Name:** <b>{character_data["name"]}</b>\n'
+            f'🔹 **Category:** <b>{character_data["category"]}</b>\n'
+            f'🎖 **Rarity:** <b>{character_data["rarity"]}</b>\n\n'
+            f'🏆 **Rewards:**\n'
+            f'💰 **Zeni:** {coins_won}\n'
+            f'💎 **Chrono Crystals:** {chrono_crystals_won}\n\n'
+            f'This character has been added to your collection. Use /collection to see your collection!',
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
     else:
-        await update.message.reply_text('Please Write Correct Character Name... ❌️')
-   
+        await update.message.reply_text('❌ Incorrect character name. Try again!')
+
+  
 
 async def fav(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id

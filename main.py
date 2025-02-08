@@ -52,8 +52,6 @@ def escape_markdown(text):
     return re.sub(r'([%s])' % re.escape(escape_chars), r'\\\1', text)
 
 
-
-
 async def message_counter(update: Update, context: CallbackContext) -> None:
     chat_id = str(update.effective_chat.id)
     user_id = update.effective_user.id
@@ -65,14 +63,16 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
     # ✅ Log the correct droptime (AFTER fetching from DB)
     print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {message_counts.get(chat_id, 0)} | Drop at: {message_frequency}")
 
-        # Count messages per group
-        message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
+    # ✅ Count messages per group
+    message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
 
-        # If message count reaches the threshold, drop a character
-        if message_counts[chat_id] >= message_frequency:
-            print(f"🟢 [DEBUG] Triggering send_image() in {chat_id}")
-            await send_image(update, context)
-            message_counts[chat_id] = 0  # Reset counter
+    # ✅ If message count reaches the threshold, drop a character
+    if message_counts[chat_id] >= message_frequency:
+        print(f"🟢 [DEBUG] Triggering send_image() in {chat_id}")
+        await send_image(update, context)
+        message_counts[chat_id] = 0  # Reset counter
+
+
 
 
 async def send_image(update: Update, context: CallbackContext) -> None:

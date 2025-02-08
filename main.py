@@ -136,6 +136,8 @@ REWARD_TABLE = {
     "🏆 Event-Exclusive": (1000, 1500, 25, 30)
 }
 
+
+
 async def guess(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
@@ -144,26 +146,32 @@ async def guess(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ No character has been dropped yet!")
         return
 
-    # ✅ Reset previous guesses when a new character appears
-    if chat_id not in first_correct_guesses or first_correct_guesses[chat_id] != last_characters[chat_id]['id']:
-        first_correct_guesses[chat_id] = None  # Reset guess tracking
+    # ✅ Fetch last dropped character details
+    dropped_character = last_characters[chat_id]
+    character_name = dropped_character["name"]
+    character_rarity = dropped_character.get("rarity", "Common")  # ✅ Ensure rarity is retrieved
 
-    if first_correct_guesses[chat_id]:
+    # ✅ Check if the character has already been guessed
+    if chat_id in first_correct_guesses and first_correct_guesses[chat_id] is not None:
         await update.message.reply_text("❌ This character has already been guessed!")
         return
 
-    guess = ' '.join(context.args).lower() if context.args else ''
-    
-    if "()" in guess or "&" in guess.lower():
+    # ✅ Extract user's guess
+    guess_text = ' '.join(context.args).lower() if context.args else ''
+    if not guess_text:
+        await update.message.reply_text("❌ Please provide a character name.")
+        return
+
+    if "()" in guess_text or "&" in guess_text.lower():
         await update.message.reply_text("❌ Invalid characters in guess.")
         return
 
-    name_parts = last_characters[chat_id]['name'].lower().split()
-    
-    if sorted(name_parts) == sorted(guess.split()) or any(part == guess for part in name_parts):
-        first_correct_guesses[chat_id] = last_characters[chat_id]['id']  # ✅ Mark character as guessed ln
+    name_parts = character_name.lower().split()
 
-        # Assign rewards based on rarity
+    if sorted(name_parts) == sorted(guess_text.split()) or any(part == guess_text for part in name_parts):
+        first_correct_guesses[chat_id] = dropped_character['id']  # ✅ Mark character as guessed
+
+        # ✅ Assign rewards based on rarity
         if character_rarity in REWARD_TABLE:
             coin_min, coin_max, cc_min, cc_max = REWARD_TABLE[character_rarity]
             coins_won = random.randint(coin_min, coin_max)
@@ -172,30 +180,30 @@ async def guess(update: Update, context: CallbackContext) -> None:
             coins_won = random.randint(100, 200)  # Default fallback
             chrono_crystals_won = random.randint(1, 5)
 
-        # Update user collection
+        # ✅ Update user collection
         user = await user_collection.find_one({'id': user_id})
         if user:
             update_fields = {}
-            if hasattr(update.effective_user, 'username') and update.effective_user.username != user.get('username'):
+            if update.effective_user.username and update.effective_user.username != user.get('username'):
                 update_fields['username'] = update.effective_user.username
             if update.effective_user.first_name != user.get('first_name'):
                 update_fields['first_name'] = update.effective_user.first_name
             if update_fields:
                 await user_collection.update_one({'id': user_id}, {'$set': update_fields})
 
-            await user_collection.update_one({'id': user_id}, {'$push': {'characters': character_data}})
+            await user_collection.update_one({'id': user_id}, {'$push': {'characters': dropped_character}})
             await user_collection.update_one({'id': user_id}, {'$inc': {'coins': coins_won, 'chrono_crystals': chrono_crystals_won}})
         else:
             await user_collection.insert_one({
                 'id': user_id,
                 'username': update.effective_user.username,
                 'first_name': update.effective_user.first_name,
-                'characters': [character_data],
+                'characters': [dropped_character],
                 'coins': coins_won,
                 'chrono_crystals': chrono_crystals_won
             })
 
-        # Update group user stats
+        # ✅ Update group user stats
         group_user_total = await group_user_totals_collection.find_one({'user_id': user_id, 'group_id': chat_id})
         if group_user_total:
             await group_user_totals_collection.update_one({'user_id': user_id, 'group_id': chat_id}, {'$inc': {'count': 1}})
@@ -208,7 +216,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
                 'count': 1
             })
 
-        # Update top global groups
+        # ✅ Update top global groups
         group_info = await top_global_groups_collection.find_one({'group_id': chat_id})
         if group_info:
             await top_global_groups_collection.update_one({'group_id': chat_id}, {'$inc': {'count': 1}})
@@ -219,23 +227,23 @@ async def guess(update: Update, context: CallbackContext) -> None:
                 'count': 1
             })
 
-        # Create response message
-        keyboard = [[InlineKeyboardButton(f"See Collection", switch_inline_query_current_chat=f"collection.{user_id}")]]
+        # ✅ Create response message
+        keyboard = [[InlineKeyboardButton("See Collection", switch_inline_query_current_chat=f"collection.{user_id}")]]
         await update.message.reply_text(
             f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> You guessed a new character! ✅️\n\n'
-            f'🆔 𝗡𝗮𝗺𝗲: <b>{character_data["name"]}</b>\n'
-            f'🔹 𝗖𝗮𝘁𝗲𝗴𝗼𝗿𝘆: <b>{character_data["category"]}</b>\n'
-            f'🎖 𝗥𝗮𝗿𝗶𝘁𝘆: <b>{character_data["rarity"]}</b>\n\n'
-            f'🏆 𝙍𝙚𝙬𝙖𝙧𝙙𝙨:\n'
-            f'💰 𝗭𝗲𝗻𝗶: {coins_won}\n'
-            f'💎 𝗖𝗵𝗿𝗼𝗻𝗼 𝗖𝗿𝘆𝘀𝘁𝗮𝗹𝘀: {chrono_crystals_won}\n\n'
+            f'🆔 <b>Name:</b> {dropped_character["name"]}\n'
+            f'🔹 <b>Category:</b> {dropped_character["category"]}\n'
+            f'🎖 <b>Rarity:</b> {dropped_character["rarity"]}\n\n'
+            f'🏆 <b>Rewards:</b>\n'
+            f'💰 <b>Zeni:</b> {coins_won}\n'
+            f'💎 <b>Chrono Crystals:</b> {chrono_crystals_won}\n\n'
             f'This character has been added to your collection. Use /collection to see your collection!',
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
     else:
-        await update.message.reply_text('❌ Incorrect character name. Try again!')
+        await update.message.reply_text("❌ Incorrect character name. Try again!")
 
   
 

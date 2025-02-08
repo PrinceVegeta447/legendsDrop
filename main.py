@@ -55,19 +55,15 @@ def escape_markdown(text):
 
 
 async def message_counter(update: Update, context: CallbackContext) -> None:
-    chat_id = str(update.effective_chat.id)  # Ensure chat_id is a string
+    chat_id = str(update.effective_chat.id)
     user_id = update.effective_user.id
 
-    if chat_id not in locks:
-        locks[chat_id] = asyncio.Lock()
-    lock = locks[chat_id]
+    # ✅ Always fetch the latest droptime from MongoDB
+    chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
+    message_frequency = chat_frequency["message_frequency"] if chat_frequency else 100
 
-    async with lock:
-        # Fetch droptime from MongoDB
-        chat_data = await user_totals_collection.find_one({'chat_id': chat_id})
-        message_frequency = chat_data['message_frequency'] if chat_data and 'message_frequency' in chat_data else 100 # Convert to int
-
-        print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {message_counts.get(chat_id, 0)} | Drop at: {message_frequency}")
+    # ✅ Log the correct droptime (AFTER fetching from DB)
+    print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {message_counts.get(chat_id, 0)} | Drop at: {message_frequency}")
 
         # Count messages per group
         message_counts[chat_id] = message_counts.get(chat_id, 0) + 1

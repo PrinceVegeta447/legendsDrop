@@ -55,6 +55,9 @@ async def upload(update: Update, context: CallbackContext) -> None:
         return
 
     try:
+        # Debugging log
+        print(f"📥 [DEBUG] Upload Command Received - Args: {context.args}")
+
         args = context.args
         if len(args) < 4:  # Ensure at least 4 arguments exist
             await update.message.reply_text(WRONG_FORMAT_TEXT)
@@ -63,12 +66,13 @@ async def upload(update: Update, context: CallbackContext) -> None:
         image_url = args[0]  
         rarity_input = args[-2]  # Second-last argument is rarity
         category_input = args[-1]  # Last argument is category
-        character_name = ' '.join(args[1:-2])  # Everything in between is the name
 
-        # ✅ Handle special characters like `&`
-        character_name = character_name.replace("&", " & ").replace("-", " ").title()
+        # **Fix: Extract Multi-word Character Names**
+        character_name = ' '.join(args[1:-2]).replace("&", " & ").replace("-", " ").title()
 
-        # ✅ Validate image URL
+        print(f"🎯 [DEBUG] Parsed Data - Image: {image_url}, Name: {character_name}, Rarity: {rarity_input}, Category: {category_input}")
+
+        # ✅ Validate Image URL
         try:
             response = requests.get(image_url, timeout=5)
             if response.status_code != 200:
@@ -77,7 +81,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text("❌ Invalid Image URL. Please provide a working link.")
             return
 
-        # ✅ Proceed with uploading to the database...
+        # ✅ Proceed with database insertion...
 
     except Exception as e:
         await update.message.reply_text(f"❌ Upload failed! Error: {str(e)}")

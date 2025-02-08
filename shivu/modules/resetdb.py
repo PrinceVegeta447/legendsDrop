@@ -11,13 +11,14 @@ async def reset_db(update: Update, context: CallbackContext) -> None:
         return
 
     try:
-        # Delete all collections
-        await db.collection.drop()  # Delete all characters
-        await db.user_collection.drop()  # Delete user collections
-        await db.user_totals_collection.drop()  # Delete user stats
-        await db.group_user_totals_collection.drop()  # Delete group stats
-        await db.top_global_groups_collection.drop()  # Delete global leaderboard
-        await db.sequences.drop()  # Reset sequence numbers
+        # Explicitly delete all collections
+        await db["characters"].delete_many({})  # Delete all characters
+        await db["user_collection"].delete_many({})  # Delete user collections
+        await db["user_totals_collection"].delete_many({})  # Delete user stats
+        await db["group_user_totals_collection"].delete_many({})  # Delete group stats
+        await db["top_global_groups_collection"].delete_many({})  # Delete global leaderboard
+        await db["sequences"].delete_many({})  # Reset sequence numbers
+        await db["total_pm_users"].delete_many({})  # Remove PM user data
 
         await update.message.reply_text("✅ Database has been completely reset!")
 

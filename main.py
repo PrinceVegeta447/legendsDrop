@@ -221,12 +221,12 @@ async def guess(update: Update, context: CallbackContext) -> None:
         keyboard = [[InlineKeyboardButton(f"See Collection", switch_inline_query_current_chat=f"collection.{user_id}")]]
         await update.message.reply_text(
             f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> You guessed a new character! ✅️\n\n'
-            f'🆔 **Name:** <b>{character_data["name"]}</b>\n'
-            f'🔹 **Category:** <b>{character_data["category"]}</b>\n'
-            f'🎖 **Rarity:** <b>{character_data["rarity"]}</b>\n\n'
-            f'🏆 **Rewards:**\n'
-            f'💰 **Zeni:** {coins_won}\n'
-            f'💎 **Chrono Crystals:** {chrono_crystals_won}\n\n'
+            f'🆔 𝗡𝗮𝗺𝗲: <b>{character_data["name"]}</b>\n'
+            f'🔹 𝗖𝗮𝘁𝗲𝗴𝗼𝗿𝘆: <b>{character_data["category"]}</b>\n'
+            f'🎖 𝗥𝗮𝗿𝗶𝘁𝘆: <b>{character_data["rarity"]}</b>\n\n'
+            f'🏆 𝙍𝙚𝙬𝙖𝙧𝙙𝙨:\n'
+            f'💰 𝗭𝗲𝗻𝗶: {coins_won}\n'
+            f'💎 𝗖𝗵𝗿𝗼𝗻𝗼 𝗖𝗿𝘆𝘀𝘁𝗮𝗹𝘀: {chrono_crystals_won}\n\n'
             f'This character has been added to your collection. Use /collection to see your collection!',
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)

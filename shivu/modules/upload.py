@@ -138,9 +138,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
 
 # ✅ Function to delete a character
 async def delete(update: Update, context: CallbackContext) -> None:
-    user_id = update.effective_user.id
-
-    if user_id not in sudo_users and user_id != OWNER_ID:
+    if update.effective_user.id not in sudo_users and update.effective_user.id != OWNER_ID:
         await update.message.reply_text("🚫 Only bot owners can delete characters!")
         return
 
@@ -150,13 +148,30 @@ async def delete(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text("❌ Incorrect format! Use: `/delete <Character ID>`")
             return
 
-        character = await collection.find_one_and_delete({'id': args[0]})
+        character_id = args[0]
 
-        if character and "message_id" in character:
+        # Find the character in the database
+        character = await collection.find_one({"id": character_id})
+        if not character:
+            await update.message.reply_text("⚠️ Character not found in the database.")
+            return
+
+        # Delete the character from the main collection
+        await collection.delete_one({"id": character_id})
+
+        # Delete from users' collections
+        await user_collection.update_many(
+            {}, 
+            {"$pull": {"characters": {"id": character_id}}}  # Remove character from all users' collections
+        )
+
+        # Try deleting the character's message from the character channel
+        try:
             await context.bot.delete_message(chat_id=CHARA_CHANNEL_ID, message_id=character["message_id"])
-            await update.message.reply_text(f"✅ Character `{args[0]}` deleted successfully.")
-        else:
-            await update.message.reply_text("⚠️ Character deleted from the database, but was not found in the channel.")
+        except:
+            pass  # Ignore if the message doesn't exist
+
+        await update.message.reply_text(f"✅ Character `{character_id}` deleted successfully from database & user collections!")
 
     except Exception as e:
         await update.message.reply_text(f"❌ Error deleting character: {str(e)}")

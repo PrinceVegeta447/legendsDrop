@@ -6,42 +6,40 @@ from pyrogram.types import Message
 
 ADMINS = [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
 
-
-@shivuu.on_message(filters.command("set_droptime"))
 async def change_time(client: Client, message: Message):
+    chat_id = message.chat.id
     user_id = message.from_user.id
-    chat_id = str(message.chat.id)  # Store chat_id as a string
 
-    if message.chat.type == "private":
-        await message.reply_text("🚫 This command only works in groups.")
+    # Check admin permissions
+    member = await shivuu.get_chat_member(chat_id, user_id)
+    if member.status not in ADMINS and user_id not in sudo_users and user_id != OWNER_ID:
+        await message.reply_text("🚫 You are not authorized to change droptime.")
         return
 
     try:
         args = message.command
         if len(args) != 2:
-            await message.reply_text("⚠️ **Usage:** `/changetime NUMBER`")
+            await message.reply_text("❌ Use: `/changetime <number>`")
             return
 
-        new_frequency = int(args[1])
+        new_droptime = int(args[1])
 
-        # Enforce 100+ limit for regular admins, allow any value for sudo/owner
-        if new_frequency < 100 and user_id not in sudo_users and user_id != OWNER_ID:
-            await message.reply_text("⚠️ The message frequency must be **100 or higher**.")
+        # If the user is not the owner, enforce 100+ limit
+        if new_droptime < 100 and user_id not in sudo_users and user_id != OWNER_ID:
+            await message.reply_text("⚠️ Droptime must be **100+ messages**.")
             return
 
-        # Update droptime in MongoDB
+        # ✅ Update in MongoDB (persists after restart)
         await user_totals_collection.update_one(
-            {"chat_id": str(chat_id)},  # Ensure chat_id is a string
-            {"$set": {"message_frequency": new_frequency}},
-            upsert=True  # Creates new entry if it doesn’t exist
+            {'chat_id': chat_id},
+            {'$set': {'message_frequency': new_droptime}},
+            upsert=True
         )
 
-        await message.reply_text(f"✅ Successfully changed droptime to **{new_frequency} messages**.")
-    except ValueError:
-        await message.reply_text("❌ Invalid input. Please enter a **valid number**.")
-    except Exception as e:
-        await message.reply_text(f"❌ Failed to change droptime: {str(e)}")
+        await message.reply_text(f"✅ Droptime updated to **{new_droptime} messages**.")
 
+    except ValueError:
+        await message.reply_text("❌ Please enter a valid number.")
 
 @shivuu.on_message(filters.command("droptime"))
 async def view_droptime(client: Client, message: Message):

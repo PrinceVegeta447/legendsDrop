@@ -110,7 +110,8 @@ async def upload(update: Update, context: CallbackContext) -> None:
             "8": "🔀 Fusion Warrior",
             "9": "🤝 Duo",
             "10": "🔱 Super Saiyan God SS",
-            "11": "🗿 Ultra Instinct Sign"
+            "11": "🗿 Ultra Instinct Sign",
+            "12": "⚡ Super Saiyan"
         }
         category = category_map.get(category_input)
         if not category:

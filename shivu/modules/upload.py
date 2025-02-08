@@ -2,7 +2,7 @@ import requests
 from pymongo import ReturnDocument
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
-from shivu import application, sudo_users, OWNER_ID, collection, db, CHARA_CHANNEL_ID, SUPPORT_CHAT
+from shivu import application, sudo_users, OWNER_ID, collection, db, CHARA_CHANNEL_ID, SUPPORT_CHAT, user_collection
 
 # ✅ Correct command usage instructions
 WRONG_FORMAT_TEXT = """❌ Incorrect Format!

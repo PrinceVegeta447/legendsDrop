@@ -1,153 +1,103 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from itertools import groupby
-import math
-from html import escape
-import random
-from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
-from shivu import collection, user_collection, application, db
+from telegram.ext import CommandHandler, CallbackQueryHandler, CallbackContext
+from shivu import collection, user_collection, application
 
-async def harem(update: Update, context: CallbackContext, page=0) -> None:
-    """Shows the user's collected characters (Harem) with pagination, sorted by user preference."""
+# Rarity and Category Maps
+RARITY_MAP = {
+    "1": "⚪ Common",
+    "2": "🟢 Uncommon",
+    "3": "🔵 Rare",
+    "4": "🟣 Extreme",
+    "5": "🟡 Sparking",
+    "6": "🔱 Ultra",
+    "7": "💠 Legends Limited",
+    "8": "🔮 Zenkai",
+    "9": "🏆 Event-Exclusive"
+}
+
+CATEGORY_MAP = {
+    "1": "🏆 Saiyan",
+    "2": "🔥 Hybrid Saiyan",
+    "3": "🤖 Android",
+    "4": "❄️ Frieza Force",
+    "5": "✨ God Ki",
+    "6": "💪 Super Warrior",
+    "7": "🩸 Regeneration",
+    "8": "🔀 Fusion Warrior",
+    "9": "🤝 Duo",
+    "10": "🔱 Super Saiyan God SS",
+    "11": "🗿 Ultra Instinct Sign",
+    "12": "⚡ Super Saiyan",
+    "13": "❤️‍🔥 Dragon Ball Saga",
+    "14": "💫 Majin Buu Saga",
+    "15": "👾 Cell Saga",
+    "16": "📽️ Sagas From the Movies",
+    "17": "☠️ Lineage Of Evil"       
+}
+
+# Function to display sort options
+async def sort_collection(update: Update, context: CallbackContext) -> None:
+    keyboard = [
+        [InlineKeyboardButton("📌 Sort by Rarity", callback_data="sort:rarity")],
+        [InlineKeyboardButton("📌 Sort by Category", callback_data="sort:category")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("🔄 Choose how you want to sort your collection:", reply_markup=reply_markup)
+
+# Function to handle sort selection
+async def sort_callback(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    data = query.data
+
+    if data == "sort:rarity":
+        keyboard = [[InlineKeyboardButton(r, callback_data=f"set_sort:rarity:{k}")] for k, r in RARITY_MAP.items()]
+        await query.message.edit_text("🎖 Select Rarity to sort by:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "sort:category":
+        keyboard = [[InlineKeyboardButton(c, callback_data=f"set_sort:category:{k}")] for k, c in CATEGORY_MAP.items()]
+        await query.message.edit_text("🔹 Select Category to sort by:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+# Function to save user sorting preference
+async def set_sort(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    _, sort_type, value = query.data.split(":")
+
+    user_id = query.from_user.id
+    sort_field = "rarity" if sort_type == "rarity" else "category"
+    sort_value = RARITY_MAP.get(value) if sort_type == "rarity" else CATEGORY_MAP.get(value)
+
+    await user_collection.update_one({'id': user_id}, {'$set': {'sort_preference': {sort_field: value}}}, upsert=True)
+
+    await query.message.edit_text(f"✅ Your collection will now be sorted by **{sort_value}**!")
+
+# Function to display collection (sorted)
+async def harem(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     user = await user_collection.find_one({'id': user_id})
 
     if not user or 'characters' not in user or not user['characters']:
-        text = '😔 You have not collected any characters yet!'
-        if update.message:
-            await update.message.reply_text(text)
-        else:
-            await update.callback_query.edit_message_text(text)
+        await update.message.reply_text('😔 You have not collected any characters yet!')
         return
 
-    # Retrieve sorting preference from the database (Default: Category)
-    user_pref = await db.user_sorting.find_one({'user_id': user_id}) or {"sort_by": "category"}
-    sort_by = user_pref["sort_by"]
+    # Fetch user's sort preference
+    sort_preference = user.get("sort_preference", {})
+    sort_field = "rarity" if "rarity" in sort_preference else "category"
+    sort_order = sort_preference.get(sort_field)
 
     # Sort characters based on user preference
-    if sort_by == "rarity":
-        characters = sorted(user['characters'], key=lambda x: x.get('rarity', "Common"), reverse=True)
+    if sort_order:
+        characters = sorted(user['characters'], key=lambda x: x.get(sort_field, ""))
     else:
-        characters = sorted(user['characters'], key=lambda x: x.get('category', "Uncategorized"))
+        characters = user['characters']
 
-    # Group characters to count duplicates
-    character_counts = {k: len(list(v)) for k, v in groupby(characters, key=lambda x: x['id'])}
+    message_text = f"📜 **{update.effective_user.first_name}'s Collection (Sorted by {sort_field.title()})**\n"
+    for char in characters:
+        message_text += f"🏆 {char['name']} | {char.get('rarity', 'Unknown')} | {char.get('category', 'Unknown')}\n"
 
-    # Remove duplicates, keeping one instance per character
-    unique_characters = list({char['id']: char for char in characters}.values())
+    await update.message.reply_text(message_text)
 
-    # Pagination logic
-    total_pages = math.ceil(len(unique_characters) / 15)
-    page = max(0, min(page, total_pages - 1))  # Ensure valid page number
-
-    # Prepare message header
-    harem_message = f"<b>{escape(update.effective_user.first_name)}'s Harem - Page {page+1}/{total_pages} (Sorted by {sort_by.capitalize()})</b>\n"
-
-    # Get characters for the current page
-    current_characters = unique_characters[page * 15:(page + 1) * 15]
-
-    # Group characters by sorting preference
-    grouped_characters = {k: list(v) for k, v in groupby(current_characters, key=lambda x: x.get(sort_by, "Uncategorized"))}
-
-    # Add character details to message
-    for key, characters in grouped_characters.items():
-        total_in_category = await collection.count_documents({sort_by: key})
-        harem_message += f'\n<b>{key} {len(characters)}/{total_in_category}</b>\n'
-        for character in characters:
-            count = character_counts[character['id']]
-            harem_message += f'{character["id"]} {character["name"]} ×{count}\n'
-
-    # Total collection count
-    total_count = len(user['characters'])
-
-    # Buttons
-    keyboard = [[InlineKeyboardButton(f"📜 See Collection ({total_count})", switch_inline_query_current_chat=f"collection.{user_id}")]]
-    if total_pages > 1:
-        nav_buttons = []
-        if page > 0:
-            nav_buttons.append(InlineKeyboardButton("⬅️", callback_data=f"harem:{page-1}:{user_id}"))
-        if page < total_pages - 1:
-            nav_buttons.append(InlineKeyboardButton("➡️", callback_data=f"harem:{page+1}:{user_id}"))
-        keyboard.append(nav_buttons)
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # Fetch user's favorite character
-    fav_character = None
-    if 'favorites' in user and user['favorites']:
-        fav_character_id = user['favorites'][0]
-        fav_character = next((c for c in user['characters'] if c['id'] == fav_character_id), None)
-
-    # If favorite exists, send that
-    if fav_character and 'img_url' in fav_character:
-        if update.message:
-            await update.message.reply_photo(photo=fav_character['img_url'], parse_mode='HTML', caption=harem_message, reply_markup=reply_markup)
-        else:
-            if update.callback_query.message.caption != harem_message:
-                await update.callback_query.edit_message_caption(caption=harem_message, reply_markup=reply_markup, parse_mode='HTML')
-        return
-
-    # If no favorite, send a random character
-    if user['characters']:
-        random_character = random.choice(user['characters'])
-        if 'img_url' in random_character:
-            if update.message:
-                await update.message.reply_photo(photo=random_character['img_url'], parse_mode='HTML', caption=harem_message, reply_markup=reply_markup)
-            else:
-                if update.callback_query.message.caption != harem_message:
-                    await update.callback_query.edit_message_caption(caption=harem_message, reply_markup=reply_markup, parse_mode='HTML')
-            return
-
-    # If no image available, send text message
-    if update.message:
-        await update.message.reply_text(harem_message, parse_mode='HTML', reply_markup=reply_markup)
-    else:
-        if update.callback_query.message.text != harem_message:
-            await update.callback_query.edit_message_text(harem_message, parse_mode='HTML', reply_markup=reply_markup)
-
-
-async def harem_callback(update: Update, context: CallbackContext) -> None:
-    """Handles pagination when navigating through harem pages."""
-    query = update.callback_query
-    _, page, user_id = query.data.split(':')
-    page = int(page)
-    user_id = int(user_id)
-
-    # Restrict viewing to the owner of the harem
-    if query.from_user.id != user_id:
-        await query.answer("❌ This is not your Harem!", show_alert=True)
-        return
-
-    await harem(update, context, page)
-
-
-async def sort_collection(update: Update, context: CallbackContext) -> None:
-    """Sends sorting options to the user."""
-    keyboard = [
-        [InlineKeyboardButton("📌 Sort by Rarity", callback_data="sort:rarity")],
-        [InlineKeyboardButton("📂 Sort by Category", callback_data="sort:category")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("🔀 Choose how you want to sort your collection:", reply_markup=reply_markup)
-
-
-async def sort_callback(update: Update, context: CallbackContext) -> None:
-    """Handles the user's sorting preference and saves it in the database."""
-    query = update.callback_query
-    _, sort_by = query.data.split(":")
-    user_id = query.from_user.id
-
-    await db.user_sorting.update_one(
-        {"user_id": user_id}, 
-        {"$set": {"sort_by": sort_by}}, 
-        upsert=True
-    )
-
-    await query.answer(f"✅ Collection will now be sorted by {sort_by.capitalize()}")
-    await query.edit_message_text(f"✅ Collection is now sorted by **{sort_by.capitalize()}**. Use /collection to view.")
-
-
-# Add handlers to the bot
-application.add_handler(CommandHandler(["harem", "collection"], harem, block=False))
-application.add_handler(CallbackQueryHandler(harem_callback, pattern='^harem', block=False))
-application.add_handler(CommandHandler("sort", sort_collection, block=False))
-application.add_handler(CallbackQueryHandler(sort_callback, pattern="^sort:", block=False))
+# Handlers
+application.add_handler(CommandHandler("sort", sort_collection))
+application.add_handler(CallbackQueryHandler(sort_callback, pattern="^sort:"))
+application.add_handler(CallbackQueryHandler(set_sort, pattern="^set_sort:"))
+application.add_handler(CommandHandler(["harem", "collection"], harem))

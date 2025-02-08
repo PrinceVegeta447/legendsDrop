@@ -8,6 +8,7 @@ async def inventory(update: Update, context: CallbackContext) -> None:
     user = await user_collection.find_one({'id': user_id})
 
     if not user:
+        await user_collection.insert_one({'id': user_id, 'coins': 0, 'chrono_crystals': 0})  # Ensure inventory exists
         await update.message.reply_text("😔 You haven't collected any characters yet!")
         return
 
@@ -15,7 +16,7 @@ async def inventory(update: Update, context: CallbackContext) -> None:
     chrono_crystals = user.get('chrono_crystals', 0)
 
     inventory_message = (
-        f"🛒 **{update.effective_user.first_name}'s Inventory**\n\n"
+        f"🎒 **{update.effective_user.first_name}'s Inventory**\n\n"
         f"💰 **Zeni:** `{coins}`\n"
         f"💎 **Chrono Crystals:** `{chrono_crystals}`\n\n"
         f"Keep guessing to earn more rewards!"
@@ -47,15 +48,17 @@ async def modify_inventory(update: Update, context: CallbackContext, add=True) -
             return
 
         field = "coins" if item == "zeni" else "chrono_crystals"
-        update_operation = {"$inc": {field: amount if add else -amount}}
-
-        # Ensure user's inventory exists before modification
+        
+        # ✅ Ensure user has an inventory (prevents disappearing on restart)
         user = await user_collection.find_one({'id': target_id})
         if not user:
-            await update.message.reply_text("⚠️ User not found in the database.")
-            return
+            await user_collection.insert_one({'id': target_id, 'coins': 0, 'chrono_crystals': 0})
+            user = {'coins': 0, 'chrono_crystals': 0}  # Default values
 
-        await user_collection.update_one({'id': target_id}, update_operation)
+        # ✅ Prevent negative values when removing
+        new_value = max(0, user.get(field, 0) + (amount if add else -amount))
+
+        await user_collection.update_one({'id': target_id}, {'$set': {field: new_value}})
 
         action = "added to" if add else "removed from"
         await update.message.reply_text(f"✅ `{amount}` {item.capitalize()} {action} user `{target_id}`'s inventory!")

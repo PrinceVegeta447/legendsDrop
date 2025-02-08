@@ -6,9 +6,9 @@ from pyrogram.types import Message
 
 ADMINS = [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
 
-@shivuu.on_message(filters.command("set_droptime"))
+@shivuu.on_message(filters.command("setdroptime"))
 async def change_time(client: Client, message: Message):
-    chat_id = str(message.chat.id)  # Store chat_id as a string for consistency
+    chat_id = str(message.chat.id)  # Store chat_id as a string for MongoDB consistency
     user_id = message.from_user.id
 
     # ✅ Check admin permissions
@@ -20,7 +20,7 @@ async def change_time(client: Client, message: Message):
     try:
         args = message.command
         if len(args) != 2:
-            await message.reply_text("❌ Usage: `/set_droptime <number>`")
+            await message.reply_text("❌ Usage: `/setdroptime <number>`")
             return
 
         new_droptime = int(args[1])
@@ -31,15 +31,13 @@ async def change_time(client: Client, message: Message):
             return
 
         # ✅ Update in MongoDB (ensuring persistence after restarts)
-        await user_totals_collection.update_one(
+        update_result = await user_totals_collection.update_one(
             {'chat_id': chat_id},
             {'$set': {'message_frequency': new_droptime}},
             upsert=True
         )
 
-        # ✅ Confirm update with a check
-        updated_chat = await user_totals_collection.find_one({'chat_id': chat_id})
-        if updated_chat and updated_chat.get("message_frequency") == new_droptime:
+        if update_result.modified_count or update_result.upserted_id:
             await message.reply_text(f"✅ Droptime successfully updated to **{new_droptime} messages**.")
         else:
             await message.reply_text("⚠️ Droptime update may not have saved correctly. Please try again.")
@@ -51,10 +49,10 @@ async def change_time(client: Client, message: Message):
 
 @shivuu.on_message(filters.command("droptime"))
 async def view_droptime(client: Client, message: Message):
-    chat_id = message.chat.id
+    chat_id = str(message.chat.id)  # Ensure consistency with database storage
 
     try:
-        # Fetch the current droptime for this group
+        # ✅ Fetch the current droptime for this group
         chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
         message_frequency = chat_frequency.get('message_frequency', 100) if chat_frequency else 100
 

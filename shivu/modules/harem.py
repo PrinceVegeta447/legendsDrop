@@ -40,7 +40,7 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
     page = max(0, min(page, total_pages - 1))  # Ensure valid page number
 
     # Prepare message header
-    harem_message = f"<b>{escape(update.effective_user.first_name)}'s Harem - Page {page+1}/{total_pages} (Sorted by {sort_by.capitalize()})</b>\n"
+    harem_message = f"<b>{escape(update.effective_user.first_name)}'s Collection - Page {page+1}/{total_pages} (Sorted by {sort_by.capitalize()})</b>\n"
 
     # Get characters for the current page
     current_characters = unique_characters[page * 15:(page + 1) * 15]
@@ -114,7 +114,7 @@ async def harem_callback(update: Update, context: CallbackContext) -> None:
 
     # Restrict viewing to the owner of the harem
     if query.from_user.id != user_id:
-        await query.answer("❌ This is not your Harem!", show_alert=True)
+        await query.answer("❌ This is not your Collection!", show_alert=True)
         return
 
     await harem(update, context, page)

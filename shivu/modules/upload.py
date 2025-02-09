@@ -49,6 +49,7 @@ async def get_next_sequence_number(sequence_name):
     )
     return sequence_document['sequence_value']
 
+
 async def upload(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
@@ -63,7 +64,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text(WRONG_FORMAT_TEXT)
             return
 
-        file_id = args[0]  
+        file_id = args[0]  # First argument is file_id
         rarity_input = args[-2]  # Second-last argument is rarity
         category_input = args[-1]  # Last argument is category
         character_name = ' '.join(args[1:-2]).replace('-', ' ').title()  # Everything in between is the name
@@ -73,11 +74,9 @@ async def upload(update: Update, context: CallbackContext) -> None:
         if is_exclusive:
             category_input += " (Exclusive)"  # Append to category for database clarity
 
-        # ✅ Validate image URL
+        # ✅ Validate file_id by checking if it exists using Telegram's API
         try:
-            response = requests.get(file_id, timeout=5)
-            if response.status_code != 200:
-                raise ValueError("Invalid File id")
+            await context.bot.get_file(file_id)  # Attempt to get the file from Telegram servers
         except Exception:
             await update.message.reply_text("❌ Invalid File ID. Please provide correct file id.")
             return

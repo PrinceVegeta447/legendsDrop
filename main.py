@@ -286,7 +286,7 @@ def main() -> None:
     # Add command handlers
     application.add_handler(CommandHandler(["guess", "protecc", "collect", "grab", "hunt"], guess, block=False))
     application.add_handler(CommandHandler("fav", fav, block=False))
-    application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
+    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, message_counter, block=False))
     
 
     # Start polling for Telegram bot commands

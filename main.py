@@ -92,26 +92,43 @@ async def message_counter(client: Client, message: Message):  # Correct order
             await send_image(client, message)  # Correct parameter order
             message_counts[chat_id] = 0  # Reset counter
 
-async def send_image(client: Client, message: Message):
-    chat_id = message.chat.id  # ✅ Fixed `update.effective_chat.id`
+RESTRICTED_RARITIES = ["🟡 Sparking", "🔱 Ultra", "💠 Legends Limited", "🔮 Zenkai", "🏆 Event-Exclusive"]
 
-    all_characters = list(await collection.find({}).to_list(length=None))
+async def send_image(update: Update, context: CallbackContext) -> None:
+    """Drops a character in the chat while avoiding restricted rarities."""
+    chat_id = update.effective_chat.id
+
+    # ✅ Fetch all characters that are **not restricted**
+    all_characters = list(await collection.find({"rarity": {"$nin": RESTRICTED_RARITIES}}).to_list(length=None))
 
     if not all_characters:
-        print(f"❌ [DEBUG] No characters found in MongoDB for {chat_id}!")
-        return  # No characters available in the database
+        print(f"❌ [DEBUG] No valid characters found for dropping in {chat_id}!")
+        return  # No valid characters available
 
-    print(f"🟢 [DEBUG] Dropping character in {chat_id} | Total Characters: {len(all_characters)}")
-
+    # ✅ Track dropped characters to prevent duplicates
     if chat_id not in sent_characters:
         sent_characters[chat_id] = []
 
-    available_characters = [c for c in all_characters if c['_id'] not in sent_characters[chat_id]]
-
+    # ✅ Reset if all characters are already dropped
+    available_characters = [c for c in all_characters if c['id'] not in sent_characters[chat_id]]
     if not available_characters:
-        print(f"❌ [DEBUG] All characters already dropped in {chat_id}, resetting...")
-        sent_characters[chat_id] = []
-        return
+        sent_characters[chat_id] = []  # Reset tracking
+        available_characters = all_characters  # Refill with all valid characters
+
+    # ✅ Select a **random character**
+    character = random.choice(available_characters)
+    sent_characters[chat_id].append(character['id'])
+    last_characters[chat_id] = character
+
+    # ✅ Reset guess tracking for this character
+    if chat_id in first_correct_guesses:
+        del first_correct_guesses[chat_id]
+
+    # ✅ Use **file_id** instead of image URL
+    file_id = character.get('file_id', None)
+    if not file_id:
+        print(f"❌ [DEBUG] Missing `file_id` for {character['name']} | Skipping drop...")
+        return  # Skip if no file_id is present
 
     character = random.choice(available_characters)
     sent_characters[chat_id].append(character['_id'])
@@ -119,7 +136,7 @@ async def send_image(client: Client, message: Message):
 
     print(f"🎯 [DEBUG] Selected Character: {character['name']} | Image: {character['file_id']}")
 
-    await client.send_photo(  # ✅ Use `client.send_photo()`
+    await context.bot.send_photo(  # ✅ Use `client.send_photo()`
         chat_id=chat_id,
         photo=character['file_id'],
         caption=f"""🔥 𝑨 𝑪𝒉𝒂𝒓𝒂𝒄𝒕𝒆𝒓 𝑯𝒂𝒔 𝑨𝒑𝒑𝒆𝒂𝒓𝒆𝒅!🔥  

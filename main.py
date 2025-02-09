@@ -86,7 +86,6 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
             message_counts[chat_id] = 0  # Reset counter
 
 
-
 async def send_image(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
 
@@ -113,6 +112,13 @@ async def send_image(update: Update, context: CallbackContext) -> None:
     last_characters[chat_id] = character
 
     print(f"🎯 [DEBUG] Selected Character: {character['name']} | Image: {character['file_id']}")
+
+    # Validate file_id by checking if it exists using Telegram's API
+    try:
+        await context.bot.get_file(character['file_id'])  # Check if the file exists on Telegram servers
+    except Exception:
+        print(f"❌ [DEBUG] Invalid file_id for character {character['name']} | {character['file_id']}")
+        return  # Skip sending if file_id is invalid
 
     await context.bot.send_photo(
         chat_id=chat_id,

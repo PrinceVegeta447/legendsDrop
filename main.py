@@ -59,21 +59,21 @@ import asyncio
 locks = {}
 
 @shivuu.on_message(filters.ALL)
-async def message_counter(update: Update, context: CallbackContext) -> None:
-    chat_id = str(update.effective_chat.id)
-    user_id = update.effective_user.id
+async def message_counter(client: Client, message: Message):
+    chat_id = str(message.chat.id)  # Corrected for Pyrogram
+    user_id = message.from_user.id  # Corrected for Pyrogram
 
-    # Avoid counting messages from the bot itself
-    if user_id == context.bot.id:
-        return  # Skip if the message is from the bot
+    # ✅ Avoid counting bot's own messages and service messages
+    if not user_id or user_id == client.me.id:
+        return
 
-    # Initialize lock for group if not present
+    # ✅ Initialize lock for the group if not present
     if chat_id not in locks:
         locks[chat_id] = asyncio.Lock()
     lock = locks[chat_id]
 
     async with lock:
-        # ✅ Fetch the latest droptime from MongoDB
+        # ✅ Fetch latest droptime from MongoDB
         chat_data = await user_totals_collection.find_one({'chat_id': chat_id})
         message_frequency = chat_data.get("message_frequency", 100) if chat_data else 100
 
@@ -87,7 +87,7 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
         # ✅ If message count reaches the threshold, drop a character
         if message_counts[chat_id] >= message_frequency:
             print(f"🟢 [DEBUG] Triggering send_image() in {chat_id}")
-            await send_image(update, context)
+            await send_image(message, client)  # Pass `message` correctly
             message_counts[chat_id] = 0  # Reset counter
 
 

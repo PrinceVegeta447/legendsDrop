@@ -14,14 +14,14 @@ async def create_banner(update: Update, context: CallbackContext) -> None:
     try:
         args = context.args
         if len(args) != 2:
-            await update.message.reply_text("❌ **Usage:**\n`/createbanner <name> <image_url>`", parse_mode="Markdown")
+            await update.message.reply_text("❌ **Usage:**\n`/createbanner <name> <file_id>`", parse_mode="Markdown")
             return
 
-        name, image_url = args
+        name, file_id = args
 
         banner = {
             "name": name,
-            "image_url": image_url,
+            "file_id": file_id,
             "characters": []  # Stores exclusive characters added to this banner
         }
 
@@ -54,7 +54,7 @@ async def view_banners(update: Update, context: CallbackContext) -> None:
 
     for banner in banners:
         await update.message.reply_photo(
-            photo=banner["image_url"],
+            photo=banner["file_id"],
             caption=(
                 f"🎟 **Summon Banner: {banner['name']}**\n"
                 f"━━━━━━━━━━━━━━━━━━\n"

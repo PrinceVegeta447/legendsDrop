@@ -62,6 +62,10 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
     chat_id = str(update.effective_chat.id)
     user_id = update.effective_user.id
 
+    # Avoid counting messages from the bot itself
+    if user_id == context.bot.id:
+        return  # Skip if the message is from the bot
+
     # Initialize lock for group if not present
     if chat_id not in locks:
         locks[chat_id] = asyncio.Lock()

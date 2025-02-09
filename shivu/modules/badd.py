@@ -1,7 +1,7 @@
 from bson import ObjectId
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
-from shivu import application, banners_collection, collection, sudo_users, OWNER_ID
+from shivu import application, banners_collection, collection, sudo_users, OWNER_ID, CHARA_CHANNEL_ID
 
 
 async def badd(update: Update, context: CallbackContext) -> None:
@@ -66,7 +66,7 @@ async def badd(update: Update, context: CallbackContext) -> None:
         )
 
         await context.bot.send_photo(
-            chat_id=CHARA_CHANNEL
+            chat_id=CHARA_CHANNEL_ID,
             photo=character["file_id"],
             caption=log_message,
             parse_mode="Markdown"

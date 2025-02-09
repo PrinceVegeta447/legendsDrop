@@ -37,6 +37,7 @@ Use: `/upload <file_id> <character-name> <rarity-number> <category-number>`
 15. Cell Saga
 16. Sagas From the Movies
 17. Lineage Of Evil
+18. Universe Survival Saga
 """
 
 async def get_next_sequence_number(sequence_name):
@@ -115,7 +116,8 @@ async def upload(update: Update, context: CallbackContext) -> None:
             "14": "💫 Majin Buu Saga",
             "15": "👾 Cell Saga",
             "16": "📽️ Sagas From the Movies",
-            "17": "☠️ Lineage Of Evil"
+            "17": "☠️ Lineage Of Evil",
+            "18": "🌏 Universe Survival Saga
         }
         category = category_map.get(category_input)
         if not category:

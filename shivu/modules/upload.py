@@ -66,7 +66,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text(WRONG_FORMAT_TEXT)
             return
 
-        image_url = args[0]  
+        file_id = args[0]  
         rarity_input = args[-2]  # Second-last argument is rarity
         category_input = args[-1]  # Last argument is category
         character_name = ' '.join(args[1:-2]).replace('-', ' ').title()  # Everything in between is the name
@@ -78,7 +78,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
 
         # ✅ Validate image URL
         try:
-            response = requests.get(image_url, timeout=5)
+            response = requests.get(file_id, timeout=5)
             if response.status_code != 200:
                 raise ValueError("Invalid Image URL")
         except Exception:

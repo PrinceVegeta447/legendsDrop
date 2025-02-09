@@ -6,7 +6,6 @@ from pyrogram.types import Message
 
 ADMINS = [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
 
-@shivuu.on_message(filters.command("setdroptime"))
 async def change_time(client: Client, message: Message):
     chat_id = str(message.chat.id)  # Store chat_id as a string for MongoDB consistency
     user_id = message.from_user.id
@@ -47,7 +46,6 @@ async def change_time(client: Client, message: Message):
     except Exception as e:
         await message.reply_text(f"❌ Error updating droptime: {str(e)}")
 
-@shivuu.on_message(filters.command("droptime"))
 async def view_droptime(client: Client, message: Message):
     chat_id = str(message.chat.id)  # Ensure consistency with database storage
 
@@ -59,3 +57,6 @@ async def view_droptime(client: Client, message: Message):
         await message.reply_text(f"📊 **Current Droptime:** `{message_frequency} messages`")
     except Exception as e:
         await message.reply_text(f"❌ Failed to fetch droptime: {str(e)}")
+
+application.add_handler(CommandHandler("setdroptime", change_time, block=False))
+application.add_handler(CommandHandler("droptime", view_droptime, block=False))

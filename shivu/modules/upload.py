@@ -42,7 +42,6 @@ Example:
 17. Lineage Of Evil
 """
 
-# ✅ Function to generate a unique character ID
 async def get_next_sequence_number(sequence_name):
     sequence_collection = db.sequences
     sequence_document = await sequence_collection.find_one_and_update(
@@ -53,40 +52,39 @@ async def get_next_sequence_number(sequence_name):
     )
     return sequence_document['sequence_value']
 
-# ✅ Function to upload a character
 async def upload(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
-    # 🔒 Check if user has permission
     if user_id not in sudo_users and user_id != OWNER_ID:
         await update.message.reply_text("🚫 You don't have permission to upload characters!")
         return
 
     try:
         args = context.args
-        print(f"📥 [DEBUG] Upload Command Received - Args: {args}")  # Log received arguments
-
-        if len(args) < 4:  # Ensure at least 4 arguments exist
+        if len(args) < 4:
             await update.message.reply_text(WRONG_FORMAT_TEXT)
             return
 
-        image_url = args[0]  
-        rarity_input = args[-2]  # Second-last argument is rarity
-        category_input = args[-1]  # Last argument is category
-        character_name = ' '.join(args[1:-2]).replace('-', ' ').title()  # Everything in between is the name
+        image_url = args[0]
+        character_name = ' '.join(args[1:-2]).replace('-', ' ').title()
+        rarity_input = args[-2]
+        category_input = args[-1]
 
-        print(f"🎯 [DEBUG] Parsed Data - Image: {image_url}, Name: {character_name}, Rarity: {rarity_input}, Category: {category_input}")
+        # Check if the character is exclusive
+        is_exclusive = False
+        if category_input.lower() == "exclusive":
+            is_exclusive = True
+            category_input = args[-2]  # Use the previous argument as category
+            rarity_input = args[-3]  # Adjust rarity accordingly
 
-        # ✅ Validate image URL (Check if it's a valid direct image)
         try:
             response = requests.get(image_url, timeout=5)
             if response.status_code != 200:
                 raise ValueError("Invalid Image URL")
-        except Exception as e:
-            await update.message.reply_text(f"❌ Invalid Image URL. Error: {str(e)}\nTry using a direct link ending with .jpg or .png.")
+        except:
+            await update.message.reply_text("❌ Invalid Image URL.")
             return
 
-        # ✅ Define DBL rarity levels
         rarity_map = {
             "1": "⚪ Common",
             "2": "🟢 Uncommon",
@@ -103,7 +101,6 @@ async def upload(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text("❌ Invalid Rarity. Use numbers: 1-9.")
             return
 
-        # ✅ Define character categories
         category_map = {
             "1": "🏆 Saiyan",
             "2": "🔥 Hybrid Saiyan",
@@ -128,44 +125,45 @@ async def upload(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text("❌ Invalid Category. Use numbers: 1-9.")
             return
 
-        # ✅ Generate unique character ID
         char_id = str(await get_next_sequence_number("character_id")).zfill(3)
-        print(f"🔢 [DEBUG] Generated Character ID: {char_id}")
 
         character = {
             'img_url': image_url,
             'name': character_name,
             'rarity': rarity,
             'category': category,
-            'id': char_id
+            'id': char_id,
+            'exclusive': is_exclusive  # Mark as exclusive if applicable
         }
 
-        # ✅ Send the character image to the character channel
         try:
-            print(f"📤 [DEBUG] Sending Image to Character Channel {CHARA_CHANNEL_ID}...")
+            caption_text = (
+                f"🏆 **New Character Added!**\n\n"
+                f"🔥 **Character:** {character_name}\n"
+                f"🎖️ **Rarity:** {rarity}\n"
+                f"🔹 **Category:** {category}\n"
+                f"🆔 **ID:** {char_id}\n\n"
+                f"👤 Added by [{update.effective_user.first_name}](tg://user?id={user_id})"
+            )
+
+            if is_exclusive:
+                caption_text += "\n🚀 **Exclusive Character** 🚀"
+
             message = await context.bot.send_photo(
                 chat_id=CHARA_CHANNEL_ID,
                 photo=image_url,
-                caption=f"🏆 **New Character Added!**\n\n"
-                        f"🔥 **Character:** {character_name}\n"
-                        f"🎖️ **Rarity:** {rarity}\n"
-                        f"🔹 **Category:** {category}\n"
-                        f"🆔 **ID:** {char_id}\n\n"
-                        f"👤 Added by [{update.effective_user.first_name}](tg://user?id={user_id})",
+                caption=caption_text,
                 parse_mode='Markdown'
             )
+
             character["message_id"] = message.message_id
             await collection.insert_one(character)
-            print(f"✅ [DEBUG] Character Added Successfully!")
             await update.message.reply_text(f"✅ `{character_name}` successfully added!")
-
         except Exception as e:
-            print(f"❌ [ERROR] Failed to Send Image: {str(e)}")
             await update.message.reply_text(f"⚠️ Character added, but couldn't send image. Error: {str(e)}")
 
     except Exception as e:
-        print(f"❌ [ERROR] Upload Failed: {str(e)}")
-        await update.message.reply_text(f"❌ Upload failed! Error: {str(e)}\nContact support: {SUPPORT_CHAT}")
+        await update.message.reply_text(f"❌ Upload failed! Error: {str(e)}")
 
 # ✅ Function to delete a character
 async def delete(update: Update, context: CallbackContext) -> None:

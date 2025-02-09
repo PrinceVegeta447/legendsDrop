@@ -240,9 +240,92 @@ async def summon_callback(update: Update, context: CallbackContext):
         banner_id = data[1]
         await summon_from_banner(update, context, banner_id)  # Call summon function
 
+# ✅ View characters in a banner
+async def view_banner_characters(update: Update, context: CallbackContext) -> None:
+    """Displays all characters in a banner, with pagination support."""
+    query = update.callback_query
+    data = query.data.split(":")
+    
+    if len(data) < 2:
+        return  # Invalid callback format
+    
+    banner_id = data[1]
+    page = int(data[2]) if len(data) == 3 else 0  # Handle pagination
+    
+    # ✅ Fetch banner
+    try:
+        banner = await banners_collection.find_one({"_id": ObjectId(banner_id)})
+        if not banner:
+            await query.message.edit_text("❌ This banner does not exist!")
+            return
+    except:
+        await query.message.edit_text("❌ Invalid Banner ID!")
+        return
+
+    characters = banner.get("characters", [])
+    if not characters:
+        await query.message.edit_text(f"❌ No characters in the `{banner['name']}` banner yet!")
+        return
+
+    # ✅ Pagination Logic
+    characters_per_page = 5
+    total_pages = (len(characters) + characters_per_page - 1) // characters_per_page
+    page = max(0, min(page, total_pages - 1))  # Ensure page number is within bounds
+
+    start_index = page * characters_per_page
+    end_index = start_index + characters_per_page
+    paginated_characters = characters[start_index:end_index]
+
+    # ✅ Create character list message
+    character_list = f"🎟 **{banner['name']} Banner** - Characters\n\n"
+    for character in paginated_characters:
+        character_list += f"🔥 **{character['name']}**\n"
+        character_list += f"🎖 **Rarity:** {character['rarity']}\n"
+        character_list += f"🔹 **Category:** {character['category']}\n\n"
+
+    # ✅ Pagination Buttons
+    keyboard = []
+    if total_pages > 1:
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"view:{banner_id}:{page-1}"))
+        if page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"view:{banner_id}:{page+1}"))
+        keyboard.append(nav_buttons)
+
+    keyboard.append([[InlineKeyboardButton("🔙 Back", callback_data=f"back_to_banner:{banner_id}")]])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.message.edit_text(character_list, parse_mode="Markdown", reply_markup=reply_markup)
+
+# ✅ Back to banner view
+async def back_to_banner(update: Update, context: CallbackContext) -> None:
+    """Returns user to the main banner view."""
+    query = update.callback_query
+    banner_id = query.data.split(":")[1]
+
+    try:
+        banner = await banners_collection.find_one({"_id": ObjectId(banner_id)})
+        if not banner:
+            await query.message.edit_text("❌ This banner does not exist!")
+            return
+    except:
+        await query.message.edit_text("❌ Invalid Banner ID!")
+        return
+
+    keyboard = [
+        [InlineKeyboardButton("🎟 Summon", callback_data=f"summon:{banner_id}")],
+        [InlineKeyboardButton("🔍 View Characters", callback_data=f"view:{banner_id}:0")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.message.edit_caption(caption=f"🎟 **{banner['name']}**", parse_mode="Markdown", reply_markup=reply_markup)
+
 # ✅ Add Handlers
 application.add_handler(CommandHandler("createbanner", create_banner))
 application.add_handler(CommandHandler("bupload", banner_upload))
 application.add_handler(CommandHandler("banners", view_banners))
 application.add_handler(CommandHandler("deletebanner", delete_banner))
 application.add_handler(CallbackQueryHandler(summon_callback, pattern="^summon:"))
+application.add_handler(CallbackQueryHandler(view_banner_characters, pattern="^view:"))
+application.add_handler(CallbackQueryHandler(back_to_banner, pattern="^back_to_banner:"))

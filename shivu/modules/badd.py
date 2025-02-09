@@ -3,8 +3,10 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 from shivu import application, banners_collection, collection, sudo_users, OWNER_ID
 
+LOG_CHANNEL_ID = -1001234567890  # 🔹 Replace this with your actual log channel ID
+
 async def badd(update: Update, context: CallbackContext) -> None:
-    """Moves a normal character (from /upload) to a banner."""
+    """Moves a normal character (from /upload) to a banner & logs it."""
     user_id = update.effective_user.id
 
     # ✅ Permission check
@@ -33,6 +35,8 @@ async def badd(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text("❌ No banner found with this ID!")
             return
 
+        banner_name = banner.get("name", "Unknown Banner")  # ✅ Ensure correct banner name
+
         # ✅ Fetch the character from normal collection
         character = await collection.find_one({"id": character_id})
         if not character:
@@ -41,7 +45,7 @@ async def badd(update: Update, context: CallbackContext) -> None:
 
         # ✅ Prevent duplicate characters in the banner
         if any(c["id"] == character_id for c in banner.get("characters", [])):
-            await update.message.reply_text(f"⚠️ `{character['name']}` is already in `{banner['name']}`!")
+            await update.message.reply_text(f"⚠️ `{character['name']}` is already in `{banner_name}`!")
             return
 
         # ✅ Add the character to the banner
@@ -50,7 +54,24 @@ async def badd(update: Update, context: CallbackContext) -> None:
             {"$push": {"characters": character}}
         )
 
-        await update.message.reply_text(f"✅ `{character['name']}` added to `{banner['name']}` banner!")
+        await update.message.reply_text(f"✅ `{character['name']}` added to `{banner_name}` banner!")
+
+        # ✅ Log upload in log channel
+        log_message = (
+            f"📢 **Character Added to Banner** 📢\n\n"
+            f"🔹 **Banner:** `{banner_name}`\n"
+            f"🔸 **Character:** `{character['name']}`\n"
+            f"🎖 **Rarity:** `{character['rarity']}`\n"
+            f"🔹 **Category:** `{character['category']}`\n"
+            f"📸 **Uploaded By:** [{update.effective_user.first_name}](tg://user?id={user_id})"
+        )
+
+        await context.bot.send_photo(
+            chat_id=LOG_CHANNEL_ID,
+            photo=character["image_url"],
+            caption=log_message,
+            parse_mode="Markdown"
+        )
 
     except Exception as e:
         await update.message.reply_text(f"❌ Error adding character to banner: {str(e)}")
@@ -85,6 +106,8 @@ async def bdelete(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text("❌ No banner found with this ID!")
             return
 
+        banner_name = banner.get("name", "Unknown Banner")  # ✅ Ensure correct banner name
+
         # ✅ Check if the character exists in the banner
         characters = banner.get("characters", [])
         character_to_delete = next((c for c in characters if c["id"] == character_id), None)
@@ -99,7 +122,7 @@ async def bdelete(update: Update, context: CallbackContext) -> None:
             {"$pull": {"characters": {"id": character_id}}}
         )
 
-        await update.message.reply_text(f"✅ `{character_to_delete['name']}` removed from `{banner['name']}` banner!")
+        await update.message.reply_text(f"✅ `{character_to_delete['name']}` removed from `{banner_name}` banner!")
 
     except Exception as e:
         await update.message.reply_text(f"❌ Error deleting character: {str(e)}")

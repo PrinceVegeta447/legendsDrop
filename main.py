@@ -59,9 +59,9 @@ import asyncio
 locks = {}
 
 @shivuu.on_message(filters.ALL)
-async def message_counter(client: Client, message: Message):
-    chat_id = str(message.chat.id)  # Corrected for Pyrogram
-    user_id = message.from_user.id  # Corrected for Pyrogram
+async def message_counter(client: Client, message: Message):  # Correct order
+    chat_id = str(message.chat.id)
+    user_id = message.from_user.id
 
     # ✅ Avoid counting bot's own messages and service messages
     if not user_id or user_id == client.me.id:
@@ -77,7 +77,7 @@ async def message_counter(client: Client, message: Message):
         chat_data = await user_totals_collection.find_one({'chat_id': chat_id})
         message_frequency = chat_data.get("message_frequency", 100) if chat_data else 100
 
-        # ✅ Debugging log (AFTER fetching from DB)
+        # ✅ Debugging log
         current_count = message_counts.get(chat_id, 0)
         print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {current_count} | Drop at: {message_frequency}")
 
@@ -87,9 +87,8 @@ async def message_counter(client: Client, message: Message):
         # ✅ If message count reaches the threshold, drop a character
         if message_counts[chat_id] >= message_frequency:
             print(f"🟢 [DEBUG] Triggering send_image() in {chat_id}")
-            await send_image(message, client)  # Pass `message` correctly
+            await send_image(client, message)  # Correct parameter order
             message_counts[chat_id] = 0  # Reset counter
-
 
 async def send_image(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id

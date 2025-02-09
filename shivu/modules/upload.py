@@ -6,10 +6,7 @@ from shivu import application, sudo_users, OWNER_ID, collection, db, CHARA_CHANN
 
 # ✅ Correct command usage instructions
 WRONG_FORMAT_TEXT = """❌ Incorrect Format!
-Use: `/upload <image_url> <character-name> <rarity-number> <category-number>`
-
-Example:  
-`/upload https://example.com/goku.jpg Goku 5 1`
+Use: `/upload <file_id> <character-name> <rarity-number> <category-number>`
 
 🎖️ **Rarity Guide:**  
 1️⃣ Common  
@@ -80,9 +77,9 @@ async def upload(update: Update, context: CallbackContext) -> None:
         try:
             response = requests.get(file_id, timeout=5)
             if response.status_code != 200:
-                raise ValueError("Invalid Image URL")
+                raise ValueError("Invalid File id")
         except Exception:
-            await update.message.reply_text("❌ Invalid Image URL. Please provide a working link.")
+            await update.message.reply_text("❌ Invalid File ID. Please provide correct file id.")
             return
 
 
@@ -129,7 +126,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
         char_id = str(await get_next_sequence_number("character_id")).zfill(3)
 
         character = {
-            'img_url': image_url,
+            'file_id': file_id,
             'name': character_name,
             'rarity': rarity,
             'category': category,
@@ -152,7 +149,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
 
             message = await context.bot.send_photo(
                 chat_id=CHARA_CHANNEL_ID,
-                photo=image_url,
+                photo=file_id,
                 caption=caption_text,
                 parse_mode='Markdown'
             )

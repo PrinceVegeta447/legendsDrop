@@ -83,7 +83,7 @@ async def summon(update: Update, context: CallbackContext) -> None:
     rarest_character = max(summoned_characters, key=lambda char: RARITY_ORDER.index(char.get('rarity', "⚪ Common")))
 
     # ✅ Check if rarest character has an image
-    rarest_image = rarest_character.get('image_url')
+    rarest_image = rarest_character.get('file_id')
     if not rarest_image:
         rarest_image = "https://example.com/default_image.jpg"  # Set a default image if missing
 

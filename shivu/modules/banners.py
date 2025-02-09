@@ -28,15 +28,15 @@ CATEGORY_MAP = {
     "6": "💪 Super Warrior",
     "7": "🩸 Regeneration",
     "8": "🔀 Fusion Warrior",
-    "9": "🤝 Duo"
-    "10": "🔱 Super Saiyan God SS",
-    "11": "🗿 Ultra Instinct Sign",
-    "12": "⚡ Super Saiyan",
-    "13": "❤️‍🔥 Dragon Ball Saga",
-    "14": "💫 Majin Buu Saga",
-    "15": "👾 Cell Saga",
-    "16": "📽️ Sagas From the Movies",
-    "17": "☠️ Lineage Of Evil"
+    "9": "🤝 Duo",
+   "10": "🔱 Super Saiyan God SS",
+   "11": "🗿 Ultra Instinct Sign",
+   "12": "⚡ Super Saiyan",
+   "13": "❤️‍🔥 Dragon Ball Saga",
+   "14": "💫 Majin Buu Saga",
+   "15": "👾 Cell Saga",
+   "16": "📽️ Sagas From the Movies",
+   "17": "☠️ Lineage Of Evil"
 }
 # ✅ Create a new banner
 async def create_banner(update: Update, context: CallbackContext) -> None:

@@ -22,5 +22,4 @@ async def get_file_id_cmd(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(f"📂 **File ID Extracted:**\n`{file_id}`", parse_mode="Markdown")
 
 # ✅ Add Handlers
-application.add_handler(MessageHandler(filters.PHOTO & ~filters.COMMAND, get_file_id))
 application.add_handler(CommandHandler("fileid", get_file_id_cmd, block=False))

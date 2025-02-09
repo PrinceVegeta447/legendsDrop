@@ -60,69 +60,55 @@ import asyncio
 # Lock system to prevent race conditions in high-traffic groups
 locks = {}
 
-@shivuu.on_message(filters.all)
-async def message_counter(client: Client, message: Message):  # Correct order
-    chat_id = str(message.chat.id)
-    user_id = message.from_user.id
+async def message_counter(update: Update, context: CallbackContext) -> None:
+    """Counts messages in a group and triggers a character drop at a set frequency."""
+    chat_id = str(update.effective_chat.id)
+    user_id = update.effective_user.id
 
-    # ✅ Avoid counting bot's own messages and service messages
-    if not user_id or user_id == client.me.id:
-        return
+    if not user_id:
+        return  # Ignore messages without user IDs (e.g., service messages)
 
-    # ✅ Initialize lock for the group if not present
     if chat_id not in locks:
         locks[chat_id] = asyncio.Lock()
-    lock = locks[chat_id]
 
-    async with lock:
-        # ✅ Fetch latest droptime from MongoDB
+    async with locks[chat_id]:
         chat_data = await user_totals_collection.find_one({'chat_id': chat_id})
         message_frequency = chat_data.get("message_frequency", 100) if chat_data else 100
 
-        # ✅ Debugging log
-        current_count = message_counts.get(chat_id, 0)
-        print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {current_count} | Drop at: {message_frequency}")
+        message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
 
-        # ✅ Count messages for this group
-        message_counts[chat_id] = current_count + 1
-
-        # ✅ If message count reaches the threshold, drop a character
         if message_counts[chat_id] >= message_frequency:
-            print(f"🟢 [DEBUG] Triggering send_image() in {chat_id}")
-            await send_image(client, message)  # Correct parameter order
+            await send_image(update, context)
             message_counts[chat_id] = 0  # Reset counter
 
 RESTRICTED_RARITIES = ["🟡 Sparking", "🔱 Ultra", "💠 Legends Limited", "🔮 Zenkai", "🏆 Event-Exclusive"]
 
 async def send_image(update: Update, context: CallbackContext) -> None:
     """Drops a character in the chat while avoiding restricted rarities."""
-    chat_id = message.chat.id
-
-    # ✅ Fetch all characters that are **not restricted**
+    chat_id = update.effective_chat.id
     all_characters = list(await collection.find({"rarity": {"$nin": RESTRICTED_RARITIES}}).to_list(length=None))
 
     if not all_characters:
-        print(f"❌ [DEBUG] No valid characters found for dropping in {chat_id}!")
-        return  # No valid characters available
+        return
 
-    # ✅ Track dropped characters to prevent duplicates
     if chat_id not in sent_characters:
         sent_characters[chat_id] = []
 
-    # ✅ Reset if all characters are already dropped
     available_characters = [c for c in all_characters if c['id'] not in sent_characters[chat_id]]
     if not available_characters:
-        sent_characters[chat_id] = []  # Reset tracking
-        available_characters = all_characters  # Refill with all valid characters
+        sent_characters[chat_id] = []
+        available_characters = all_characters
 
-    # ✅ Select a **random character**
     character = random.choice(available_characters)
     sent_characters[chat_id].append(character['id'])
     last_characters[chat_id] = character
 
-    # ✅ Reset guess tracking for this character
     if chat_id in first_correct_guesses:
         del first_correct_guesses[chat_id]
+
+    file_id = character.get('file_id')
+    if not file_id:
+        return
 
     # ✅ Use **file_id** instead of image URL
     file_id = character.get('file_id', None)
@@ -302,7 +288,8 @@ def main() -> None:
     # Add command handlers
     application.add_handler(CommandHandler(["guess", "protecc", "collect", "grab", "hunt"], guess, block=False))
     application.add_handler(CommandHandler("fav", fav, block=False))
-    application.add_handler(MessageHandler(filters.all, message_counter, block=False))
+    application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
+    
 
     # Start polling for Telegram bot commands
     application.run_polling(drop_pending_updates=True)

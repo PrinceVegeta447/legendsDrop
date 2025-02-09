@@ -96,7 +96,7 @@ RESTRICTED_RARITIES = ["🟡 Sparking", "🔱 Ultra", "💠 Legends Limited", "�
 
 async def send_image(update: Update, context: CallbackContext) -> None:
     """Drops a character in the chat while avoiding restricted rarities."""
-    chat_id = update.effective_chat.id
+    chat_id = message.chat.id
 
     # ✅ Fetch all characters that are **not restricted**
     all_characters = list(await collection.find({"rarity": {"$nin": RESTRICTED_RARITIES}}).to_list(length=None))

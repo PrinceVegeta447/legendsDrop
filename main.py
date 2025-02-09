@@ -58,6 +58,7 @@ import asyncio
 # Lock system to prevent race conditions in high-traffic groups
 locks = {}
 
+@shivuu.on_message(filters.ALL)
 async def message_counter(update: Update, context: CallbackContext) -> None:
     chat_id = str(update.effective_chat.id)
     user_id = update.effective_user.id

@@ -60,7 +60,7 @@ import asyncio
 # Lock system to prevent race conditions in high-traffic groups
 locks = {}
 
-@shivuu.on_message(filters.ALL)
+@shivuu.on_message(filters.all)
 async def message_counter(client: Client, message: Message):  # Correct order
     chat_id = str(message.chat.id)
     user_id = message.from_user.id

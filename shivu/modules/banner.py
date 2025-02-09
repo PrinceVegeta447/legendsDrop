@@ -34,7 +34,7 @@ async def create_banner(update: Update, context: CallbackContext) -> None:
             f"🎟 **Banner Name:** `{name}`\n"
             f"🆔 **Banner ID:** `{banner_id}`\n\n"
             f"🔹 **Next Steps:**\n"
-            f"➜ Use `/bupload` to add characters.\n"
+            f"➜ Use `/badd` to add characters.\n"
             f"➜ Use `/banners` to view banners.\n\n"
             f"✨ **Good Luck Summoning!** 🎉",
             parse_mode="Markdown"

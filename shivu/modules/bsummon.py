@@ -80,7 +80,12 @@ async def summon(update: Update, context: CallbackContext) -> None:
     await user_collection.update_one({'id': user_id}, {'$push': {'characters': {'$each': summoned_characters}}})
 
     # ✅ Identify rarest character
-    rarest_character = max(summoned_characters, key=lambda char: RARITY_ORDER.index(char['rarity']))
+    rarest_character = max(summoned_characters, key=lambda char: RARITY_ORDER.index(char.get('rarity', "⚪ Common")))
+
+    # ✅ Check if rarest character has an image
+    rarest_image = rarest_character.get('image_url')
+    if not rarest_image:
+        rarest_image = "https://example.com/default_image.jpg"  # Set a default image if missing
 
     # ✅ Create summon result message with a structured format
     summon_results = (
@@ -100,7 +105,7 @@ async def summon(update: Update, context: CallbackContext) -> None:
     # ✅ Send rarest character’s image & results
     await animation_message.delete()
     await update.message.reply_photo(
-        photo=rarest_character['image_url'],
+        photo=rarest_image,
         caption=summon_results,
         parse_mode="Markdown",
         reply_markup=reply_markup

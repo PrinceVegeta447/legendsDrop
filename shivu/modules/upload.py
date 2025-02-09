@@ -222,7 +222,7 @@ async def update(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text("❌ Character not found.")
             return
 
-        valid_fields = ["img_url", "name", "rarity", "category"]
+        valid_fields = ["file_id", "name", "rarity", "category"]
         if args[1] not in valid_fields:
             await update.message.reply_text(f"❌ Invalid field! Use one of: {', '.join(valid_fields)}")
             return

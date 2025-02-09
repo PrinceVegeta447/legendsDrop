@@ -54,6 +54,7 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
         f"🎴 **{escape(update.effective_user.first_name)}'s Collection**\n"
         f"📖 **Page {page + 1}/{total_pages}** (Sorted by `{sort_by.capitalize()}`)\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
+    )
 
     # Current page characters  
     current_characters = unique_characters[page * 15:(page + 1) * 15]  

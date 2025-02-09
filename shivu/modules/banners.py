@@ -1,6 +1,6 @@
 import random
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CommandHandler, CallbackContext
+from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
 from shivu import application, banners_collection, user_collection, OWNER_ID, sudo_users
 from bson import ObjectId
 
@@ -122,8 +122,74 @@ async def delete_banner(update: Update, context: CallbackContext) -> None:
     except Exception as e:
         await update.message.reply_text(f"❌ Error deleting banner: {str(e)}")
 
+
+async def summon_from_banner(update: Update, context: CallbackContext, banner_id: str):
+    """Handles summoning characters from a specific banner."""
+    user_id = update.effective_user.id
+
+    # ✅ Fetch user data
+    user = await user_collection.find_one({'id': user_id})
+    if not user:
+        await update.callback_query.message.reply_text("❌ You need Chrono Crystals to summon!")
+        return
+
+    # ✅ Check if the banner exists
+    try:
+        banner = await banners_collection.find_one({"_id": ObjectId(banner_id)})
+        if not banner:
+            await update.callback_query.message.reply_text("❌ This banner does not exist!")
+            return
+    except:
+        await update.callback_query.message.reply_text("❌ Invalid Banner ID!")
+        return
+
+    # ✅ Fetch banner characters
+    banner_characters = banner.get("characters", [])
+    if not banner_characters:
+        await update.callback_query.message.reply_text("❌ No characters available in this banner!")
+        return
+
+    # ✅ Check if user has enough CC
+    summon_cost = 60  # Per summon
+    if user.get("chrono_crystals", 0) < summon_cost:
+        await update.callback_query.message.reply_text(f"❌ Not enough Chrono Crystals! You need {summon_cost} CC.")
+        return
+
+    # ✅ Deduct Chrono Crystals
+    await user_collection.update_one({'id': user_id}, {'$inc': {'chrono_crystals': -summon_cost}})
+
+    # ✅ Randomly select a character from the banner
+    summoned_character = random.choice(banner_characters)
+
+    # ✅ Add the character to the user's collection
+    await user_collection.update_one({'id': user_id}, {'$push': {'characters': summoned_character}})
+
+    # ✅ Send the summon result
+    await update.callback_query.message.reply_photo(
+        photo=summoned_character["image_url"],
+        caption=f"🎉 **Summon Result** 🎉\n\n"
+                f"🔥 **Character:** {summoned_character['name']}\n"
+                f"🎖️ **Rarity:** {summoned_character['rarity']}\n"
+                f"🔹 **Category:** {summoned_character['category']}\n\n"
+                f"Use /collection to view your collection!",
+        parse_mode="Markdown"
+    )
+
+
+async def summon_callback(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()  # Acknowledge the button press
+
+    data = query.data.split(":")
+    
+    if data[0] == "summon_banner":
+        banner_id = data[1]
+        await summon_from_banner(update, context, banner_id)  # Call summon function
+
+
 # ✅ Add Handlers
 application.add_handler(CommandHandler("createbanner", create_banner))
 application.add_handler(CommandHandler("bupload", banner_upload))
 application.add_handler(CommandHandler("banners", view_banners))
 application.add_handler(CommandHandler("deletebanner", delete_banner))
+application.add_handler(CallbackQueryHandler(summon_callback, pattern="^summon_banner:"))

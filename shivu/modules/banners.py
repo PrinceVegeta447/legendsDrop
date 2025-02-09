@@ -4,6 +4,40 @@ from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
 from shivu import application, banners_collection, user_collection, OWNER_ID, sudo_users
 from bson import ObjectId
 
+
+# ✅ Define Rarity Map
+RARITY_MAP = {
+    "1": "⚪ Common",
+    "2": "🟢 Uncommon",
+    "3": "🔵 Rare",
+    "4": "🟣 Extreme",
+    "5": "🟡 Sparking",
+    "6": "🔱 Ultra",
+    "7": "💠 Legends Limited",
+    "8": "🔮 Zenkai",
+    "9": "🏆 Event-Exclusive"
+}
+
+# ✅ Define Category Map
+CATEGORY_MAP = {
+    "1": "🏆 Saiyan",
+    "2": "🔥 Hybrid Saiyan",
+    "3": "🤖 Android",
+    "4": "❄️ Frieza Force",
+    "5": "✨ God Ki",
+    "6": "💪 Super Warrior",
+    "7": "🩸 Regeneration",
+    "8": "🔀 Fusion Warrior",
+    "9": "🤝 Duo"
+    "10": "🔱 Super Saiyan God SS",
+    "11": "🗿 Ultra Instinct Sign",
+    "12": "⚡ Super Saiyan",
+    "13": "❤️‍🔥 Dragon Ball Saga",
+    "14": "💫 Majin Buu Saga",
+    "15": "👾 Cell Saga",
+    "16": "📽️ Sagas From the Movies",
+    "17": "☠️ Lineage Of Evil"
+}
 # ✅ Create a new banner
 async def create_banner(update: Update, context: CallbackContext) -> None:
     """Allows bot owners to create new banners."""
@@ -60,12 +94,24 @@ async def banner_upload(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text("❌ No banner found with this ID!")
             return
 
+        # ✅ Validate rarity & category
+        rarity_name = RARITY_MAP.get(rarity)
+        category_name = CATEGORY_MAP.get(category)
+
+        if not rarity_name:
+            await update.message.reply_text("❌ Invalid rarity! Use numbers 1-9.")
+            return
+
+        if not category_name:
+            await update.message.reply_text("❌ Invalid category! Use numbers 1-9.")
+            return
+
         # ✅ Create character object
         character = {
             "image_url": image_url,
             "name": character_name,
-            "rarity": rarity,
-            "category": category
+            "rarity": rarity_name,
+            "category": category_name
         }
 
         # ✅ Add character to the banner
@@ -74,6 +120,7 @@ async def banner_upload(update: Update, context: CallbackContext) -> None:
 
     except Exception as e:
         await update.message.reply_text(f"❌ Error uploading character: {str(e)}")
+        
 
 # ✅ View all available banners
 async def view_banners(update: Update, context: CallbackContext) -> None:

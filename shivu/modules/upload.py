@@ -85,6 +85,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text("❌ Invalid Image URL. Please provide a working link.")
             return
 
+
         rarity_map = {
             "1": "⚪ Common",
             "2": "🟢 Uncommon",

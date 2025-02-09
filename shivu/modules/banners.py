@@ -4,7 +4,7 @@ from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
 from shivu import application, banners_collection, user_collection, OWNER_ID, sudo_users
 from bson import ObjectId
 
-# ✅ Function to create a new banner
+# ✅ Create a new banner
 async def create_banner(update: Update, context: CallbackContext) -> None:
     """Allows bot owners to create new banners."""
     if update.effective_user.id not in sudo_users and update.effective_user.id != OWNER_ID:
@@ -26,15 +26,13 @@ async def create_banner(update: Update, context: CallbackContext) -> None:
         }
 
         banner_doc = await banners_collection.insert_one(banner)
-        banner_id = banner_doc.inserted_id
+        banner_id = str(banner_doc.inserted_id)  # Convert ObjectId to string
 
         await update.message.reply_text(f"✅ Banner `{name}` created successfully!\n🆔 Banner ID: `{banner_id}`")
     except Exception as e:
         await update.message.reply_text(f"❌ Error creating banner: {str(e)}")
 
-# ✅ Function to upload a character to a banner
-  # Import this at the top
-
+# ✅ Upload a character to a banner
 async def banner_upload(update: Update, context: CallbackContext) -> None:
     """Uploads a character to a banner (Exclusive Characters)."""
     if update.effective_user.id not in sudo_users and update.effective_user.id != OWNER_ID:
@@ -49,14 +47,14 @@ async def banner_upload(update: Update, context: CallbackContext) -> None:
 
         banner_id, image_url, character_name, rarity, category = args
 
-        # ✅ Convert banner_id to ObjectId
+        # ✅ Convert banner_id to ObjectId safely
         try:
-            banner_id = ObjectId(banner_id)  # Convert string ID to ObjectId
+            banner_id = ObjectId(banner_id)
         except:
             await update.message.reply_text("❌ Invalid Banner ID format!")
             return
 
-        # ✅ Fetch the banner from the database
+        # ✅ Fetch the banner
         banner = await banners_collection.find_one({"_id": banner_id})
         if not banner:
             await update.message.reply_text("❌ No banner found with this ID!")
@@ -77,7 +75,7 @@ async def banner_upload(update: Update, context: CallbackContext) -> None:
     except Exception as e:
         await update.message.reply_text(f"❌ Error uploading character: {str(e)}")
 
-# ✅ Function to display banners
+# ✅ View all available banners
 async def view_banners(update: Update, context: CallbackContext) -> None:
     """Shows all available banners."""
     banners = await banners_collection.find({}).to_list(length=None)
@@ -97,7 +95,7 @@ async def view_banners(update: Update, context: CallbackContext) -> None:
                                          caption=f"🎟 **{banner['name']}**",
                                          parse_mode="Markdown", reply_markup=reply_markup)
 
-# ✅ Function to delete a banner
+# ✅ Delete a banner
 async def delete_banner(update: Update, context: CallbackContext) -> None:
     """Deletes a banner and removes all its characters."""
     if update.effective_user.id not in sudo_users and update.effective_user.id != OWNER_ID:
@@ -112,17 +110,26 @@ async def delete_banner(update: Update, context: CallbackContext) -> None:
 
         banner_id = args[0]
 
+        # ✅ Convert banner_id to ObjectId
+        try:
+            banner_id = ObjectId(banner_id)
+        except:
+            await update.message.reply_text("❌ Invalid Banner ID format!")
+            return
+
+        # ✅ Check if banner exists
         banner = await banners_collection.find_one({"_id": banner_id})
         if not banner:
             await update.message.reply_text("❌ Invalid Banner ID!")
             return
 
+        # ✅ Delete the banner
         await banners_collection.delete_one({"_id": banner_id})
         await update.message.reply_text(f"✅ Banner `{banner['name']}` deleted successfully!")
     except Exception as e:
         await update.message.reply_text(f"❌ Error deleting banner: {str(e)}")
 
-
+# ✅ Summon a character from a banner
 async def summon_from_banner(update: Update, context: CallbackContext, banner_id: str):
     """Handles summoning characters from a specific banner."""
     user_id = update.effective_user.id
@@ -175,21 +182,20 @@ async def summon_from_banner(update: Update, context: CallbackContext, banner_id
         parse_mode="Markdown"
     )
 
-
+# ✅ Handle summon button click
 async def summon_callback(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()  # Acknowledge the button press
 
     data = query.data.split(":")
     
-    if data[0] == "summon_banner":
+    if data[0] == "summon":
         banner_id = data[1]
         await summon_from_banner(update, context, banner_id)  # Call summon function
-
 
 # ✅ Add Handlers
 application.add_handler(CommandHandler("createbanner", create_banner))
 application.add_handler(CommandHandler("bupload", banner_upload))
 application.add_handler(CommandHandler("banners", view_banners))
 application.add_handler(CommandHandler("deletebanner", delete_banner))
-application.add_handler(CallbackQueryHandler(summon_callback, pattern="^summon_banner:"))
+application.add_handler(CallbackQueryHandler(summon_callback, pattern="^summon:"))

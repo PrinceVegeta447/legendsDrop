@@ -2,6 +2,7 @@ import random
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext
 from shivu import application, banners_collection, user_collection, OWNER_ID, sudo_users
+from bson import ObjectId
 
 # ✅ Function to create a new banner
 async def create_banner(update: Update, context: CallbackContext) -> None:
@@ -32,8 +33,10 @@ async def create_banner(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text(f"❌ Error creating banner: {str(e)}")
 
 # ✅ Function to upload a character to a banner
+  # Import this at the top
+
 async def banner_upload(update: Update, context: CallbackContext) -> None:
-    """Uploads a character to a banner (Exclusive)."""
+    """Uploads a character to a banner (Exclusive Characters)."""
     if update.effective_user.id not in sudo_users and update.effective_user.id != OWNER_ID:
         await update.message.reply_text("🚫 You don't have permission to upload banner characters!")
         return
@@ -46,11 +49,20 @@ async def banner_upload(update: Update, context: CallbackContext) -> None:
 
         banner_id, image_url, character_name, rarity, category = args
 
-        banner = await banners_collection.find_one({"_id": banner_id})
-        if not banner:
-            await update.message.reply_text("❌ Invalid Banner ID!")
+        # ✅ Convert banner_id to ObjectId
+        try:
+            banner_id = ObjectId(banner_id)  # Convert string ID to ObjectId
+        except:
+            await update.message.reply_text("❌ Invalid Banner ID format!")
             return
 
+        # ✅ Fetch the banner from the database
+        banner = await banners_collection.find_one({"_id": banner_id})
+        if not banner:
+            await update.message.reply_text("❌ No banner found with this ID!")
+            return
+
+        # ✅ Create character object
         character = {
             "image_url": image_url,
             "name": character_name,
@@ -58,8 +70,10 @@ async def banner_upload(update: Update, context: CallbackContext) -> None:
             "category": category
         }
 
+        # ✅ Add character to the banner
         await banners_collection.update_one({"_id": banner_id}, {"$push": {"characters": character}})
         await update.message.reply_text(f"✅ Character `{character_name}` added to `{banner['name']}` banner!")
+
     except Exception as e:
         await update.message.reply_text(f"❌ Error uploading character: {str(e)}")
 

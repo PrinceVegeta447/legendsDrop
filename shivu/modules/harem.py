@@ -90,20 +90,19 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
     message = update.message if update.message else update.callback_query.message
 
     # Send image if available  
-    if fav_character and 'img_url' in fav_character:  
-        await message.reply_photo(photo=fav_character['img_url'], parse_mode='HTML', caption=harem_message, reply_markup=reply_markup)
+    if fav_character and 'file_id' in fav_character:  
+        await message.reply_photo(photo=fav_character['file_id'], parse_mode='HTML', caption=harem_message, reply_markup=reply_markup)
         return  
 
     # If no favorite, send a random character  
     if all_characters:  
         random_character = random.choice(all_characters)
-        if 'img_url' in random_character:  
-            await message.reply_photo(photo=random_character['img_url'], parse_mode='HTML', caption=harem_message, reply_markup=reply_markup)
+        if 'file_id' in random_character:  
+            await message.reply_photo(photo=random_character['file_id'], parse_mode='HTML', caption=harem_message, reply_markup=reply_markup)
             return  
 
     # Send text message if no image available  
     await message.edit_text(harem_message, parse_mode='HTML', reply_markup=reply_markup)
-
 
 async def harem_callback(update: Update, context: CallbackContext) -> None:
     """Handles pagination when navigating through harem pages."""
@@ -116,7 +115,10 @@ async def harem_callback(update: Update, context: CallbackContext) -> None:
         await query.answer("❌ This is not your Collection!", show_alert=True)  
         return  
 
+    # Edit the existing message instead of sending a new one
+    message = query.message
     await harem(update, context, page)
+
 
 async def sort_collection(update: Update, context: CallbackContext) -> None:
     """Allows users to choose sorting method."""

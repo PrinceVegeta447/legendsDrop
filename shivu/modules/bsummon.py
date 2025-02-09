@@ -93,7 +93,7 @@ async def summon(update: Update, context: CallbackContext) -> None:
     # ✅ Send rarest character’s image & results
     await animation_message.delete()
     await update.message.reply_photo(
-        photo=rarest_character['image_file_id'],
+        photo=rarest_character['image_url'],
         caption=summon_results,
         parse_mode="Markdown",
         reply_markup=reply_markup

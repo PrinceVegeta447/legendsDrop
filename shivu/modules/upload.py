@@ -55,34 +55,34 @@ async def get_next_sequence_number(sequence_name):
 async def upload(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
+    # 🔒 Check if user has permission
     if user_id not in sudo_users and user_id != OWNER_ID:
         await update.message.reply_text("🚫 You don't have permission to upload characters!")
         return
 
     try:
         args = context.args
-        if len(args) < 4:
+        if len(args) < 4:  # Minimum required arguments
             await update.message.reply_text(WRONG_FORMAT_TEXT)
             return
 
-        image_url = args[0]
-        character_name = ' '.join(args[1:-2]).replace('-', ' ').title()
-        rarity_input = args[-2]
-        category_input = args[-1]
+        image_url = args[0]  
+        rarity_input = args[-2]  # Second-last argument is rarity
+        category_input = args[-1]  # Last argument is category
+        character_name = ' '.join(args[1:-2]).replace('-', ' ').title()  # Everything in between is the name
 
-        # Check if the character is exclusive
-        is_exclusive = False
-        if category_input.lower() == "exclusive":
-            is_exclusive = True
-            category_input = args[-2]  # Use the previous argument as category
-            rarity_input = args[-3]  # Adjust rarity accordingly
+        # ✅ Check if character is exclusive
+        is_exclusive = "exclusive" in args
+        if is_exclusive:
+            category_input += " (Exclusive)"  # Append to category for database clarity
 
+        # ✅ Validate image URL
         try:
             response = requests.get(image_url, timeout=5)
             if response.status_code != 200:
                 raise ValueError("Invalid Image URL")
-        except:
-            await update.message.reply_text("❌ Invalid Image URL.")
+        except Exception:
+            await update.message.reply_text("❌ Invalid Image URL. Please provide a working link.")
             return
 
         rarity_map = {

@@ -59,54 +59,60 @@ import asyncio
 locks = {}
 
 async def message_counter(update: Update, context: CallbackContext) -> None:
-    """Counts messages in a group and triggers a character drop at a set frequency."""
     chat_id = str(update.effective_chat.id)
     user_id = update.effective_user.id
 
-    if not user_id:
-        return  # Ignore messages without user IDs (e.g., service messages)
+    if not user_id:  
+        return  # Ignore system messages
 
     if chat_id not in locks:
         locks[chat_id] = asyncio.Lock()
+    lock = locks[chat_id]
 
-    async with locks[chat_id]:
+    async with lock:
+        # ✅ Fetch latest droptime from MongoDB
         chat_data = await user_totals_collection.find_one({'chat_id': chat_id})
         message_frequency = chat_data.get("message_frequency", 100) if chat_data else 100
 
+        # ✅ Count messages
         message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
 
+        # ✅ Debugging Log
+        print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {message_counts[chat_id]} | Drop at: {message_frequency}")
+
+        # ✅ Drop Character if Message Count Reached
         if message_counts[chat_id] >= message_frequency:
-            await send_image(update, context)
+            print(f"🟢 [DEBUG] Triggering send_image() in {chat_id}")
+            await send_image(update, context)  # Call send_image properly
             message_counts[chat_id] = 0  # Reset counter
 
 RESTRICTED_RARITIES = ["🟡 Sparking", "🔱 Ultra", "💠 Legends Limited", "🔮 Zenkai", "🏆 Event-Exclusive"]
 
 async def send_image(update: Update, context: CallbackContext) -> None:
-    """Drops a character in the chat while avoiding restricted rarities."""
+    """Drops a character when the message frequency is reached."""
     chat_id = update.effective_chat.id
+
+    # ✅ Fetch all characters (excluding restricted rarities)
     all_characters = list(await collection.find({"rarity": {"$nin": RESTRICTED_RARITIES}}).to_list(length=None))
 
     if not all_characters:
-        return
+        print(f"❌ [DEBUG] No valid characters found for dropping in {chat_id}!")
+        return  # No valid characters available
 
+    # ✅ Prevent duplicate character drops
     if chat_id not in sent_characters:
         sent_characters[chat_id] = []
 
     available_characters = [c for c in all_characters if c['id'] not in sent_characters[chat_id]]
-    if not available_characters:
-        sent_characters[chat_id] = []
-        available_characters = all_characters
 
+    if not available_characters:
+        sent_characters[chat_id] = []  # Reset tracking
+        available_characters = all_characters  # Refill with all valid characters
+
+    # ✅ Select a **random character**
     character = random.choice(available_characters)
     sent_characters[chat_id].append(character['id'])
     last_characters[chat_id] = character
-
-    if chat_id in first_correct_guesses:
-        del first_correct_guesses[chat_id]
-
-    file_id = character.get('file_id')
-    if not file_id:
-        return
 
     # ✅ Use **file_id** instead of image URL
     file_id = character.get('file_id', None)
@@ -114,19 +120,16 @@ async def send_image(update: Update, context: CallbackContext) -> None:
         print(f"❌ [DEBUG] Missing `file_id` for {character['name']} | Skipping drop...")
         return  # Skip if no file_id is present
 
-    character = random.choice(available_characters)
-    sent_characters[chat_id].append(character['_id'])
-    last_characters[chat_id] = character
-
-    print(f"🎯 [DEBUG] Selected Character: {character['name']} | Image: {character['file_id']}")
-
-    await context.bot.send_photo(  # ✅ Use `client.send_photo()`
+    # ✅ Drop the character
+    await context.bot.send_photo(
         chat_id=chat_id,
-        photo=character['file_id'],
-        caption=f"""🔥 𝑨 𝑪𝒉𝒂𝒓𝒂𝒄𝒕𝒆𝒓 𝑯𝒂𝒔 𝑨𝒑𝒑𝒆𝒂𝒓𝒆𝒅!🔥  
-⚡ 𝑩𝒆 𝒕𝒉𝒆 𝒇𝒊𝒓𝒔𝒕 𝒕𝒐 /𝒄𝒐𝒍𝒍𝒆𝒄𝒕 𝑪𝒉𝒂𝒓𝒂𝒄𝒕𝒆𝒓 𝑵𝒂𝒎𝒆 𝒕𝒐 𝒄𝒍𝒂𝒊𝒎 𝒕𝒉𝒆𝒎!""",
-        parse_mode='markdown'
+        photo=file_id,
+        caption=f"🔥 𝑨 𝑪𝒉𝒂𝒓𝒂𝒄𝒕𝒆𝒓 𝑯𝒂𝒔 𝑨𝒑𝒑𝒆𝒂𝒓𝒆𝒅!🔥  
+⚡ 𝑩𝒆 𝒕𝒉𝒆 𝒇𝒊𝒓𝒔𝒕 𝒕𝒐 /𝒄𝒐𝒍𝒍𝒆𝒄𝒕 𝑪𝒉𝒂𝒓𝒂𝒄𝒕𝒆𝒓 𝑵𝒂𝒎𝒆 𝒕𝒐 𝒄𝒍𝒂𝒊𝒎 𝒕𝒉𝒆𝒎!",
+        parse_mode='Markdown'
     )
+
+    print(f"✅ [DEBUG] Character Dropped in {chat_id}: {character['name']}")
             
 
 # Define rewards based on rarity

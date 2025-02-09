@@ -3,7 +3,6 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 from shivu import application, banners_collection, collection, sudo_users, OWNER_ID
 
-LOG_CHANNEL_ID = -1001234567890  # 🔹 Replace this with your actual log channel ID
 
 async def badd(update: Update, context: CallbackContext) -> None:
     """Moves a normal character (from /upload) to a banner & logs it."""
@@ -67,8 +66,8 @@ async def badd(update: Update, context: CallbackContext) -> None:
         )
 
         await context.bot.send_photo(
-            chat_id=LOG_CHANNEL_ID,
-            photo=character["image_url"],
+            chat_id=CHARA_CHANNEL
+            photo=character["file_id"],
             caption=log_message,
             parse_mode="Markdown"
         )

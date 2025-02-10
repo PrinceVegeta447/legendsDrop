@@ -154,23 +154,24 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ **You need to guess characters first!**", parse_mode="Markdown")
         return
 
-    buyer_balance = buyer.get(currency, 0)
+    # ✅ Correctly fetch the balance
+    balance_field = "chrono_crystals" if currency == "cc" else "coins"
+    buyer_balance = buyer.get(balance_field, 0)
 
-    # ✅ Check if buyer has enough currency
     if buyer_balance < price:
-        await update.message.reply_text(f"❌ **Not enough {currency.capitalize()}!** You need `{price}` but have `{buyer_balance}`.", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ **Not enough {currency.capitalize()}!** You need {price} but have {buyer_balance}.", parse_mode="Markdown")
         return
 
     # ✅ Deduct currency from buyer & add character
     await user_collection.update_one({"id": user_id}, {
-        "$inc": {currency: -price},
+        "$inc": {balance_field: -price},
         "$push": {"characters": char}
     })
 
     # ✅ Transfer currency to seller
-    await user_collection.update_one({"id": seller_id}, {"$inc": {currency: price}})
+    await user_collection.update_one({"id": seller_id}, {"$inc": {balance_field: price}})
 
-    # ✅ Remove listing
+    # ✅ Remove listing from market
     await market_collection.delete_one({"_id": ObjectId(listing_id)})
 
     await update.message.reply_text(
@@ -180,7 +181,6 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         f"🔹 The character has been added to your collection!",
         parse_mode="Markdown"
     )
-
 
 
 async def market_help(update: Update, context: CallbackContext) -> None:
@@ -203,11 +203,6 @@ async def market_help(update: Update, context: CallbackContext) -> None:
     )
     await update.message.reply_text(help_message, parse_mode="HTML")
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
-from shivu import application, user_collection, market_collection
-from bson import ObjectId
-import math
 
 # ✅ View Active Listings
 async def listings(update: Update, context: CallbackContext) -> None:

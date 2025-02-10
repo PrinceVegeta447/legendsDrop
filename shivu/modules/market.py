@@ -81,10 +81,10 @@ async def market(update: Update, context: CallbackContext, page=0) -> None:
     for listing in listings_page:
         char = listing["character"]
         message += (
-            f"🎴 **{char['name']}**\n"
-            f"💰 **Price:** {listing['price']} {listing['currency'].capitalize()}\n"
-            f"👤 **Seller:** `{listing['seller_id']}`\n"
-            f"🆔 **Listing ID:** `{listing['_id']}`\n"
+            f"🎴 <b>{char['name']}</b>  |  🆔 <code>{listing['_id']}</code>\n"
+            f"🎖 <b>Rarity:</b> <code>{rarity}</code>\n"  # ✅ Display rarity
+            f"💰 <b>Price:</b> <code>{listing['price']} {listing['currency'].capitalize()}</code>\n"
+            f"👤 <b>Seller:</b> <code>{listing['seller_id']}</code>\n"
             "━━━━━━━━━━━━━━━━━━\n"
         )
 

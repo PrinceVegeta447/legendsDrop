@@ -60,5 +60,5 @@ async def add_character(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text(f"❌ Error adding character: {str(e)}")
 
 # ✅ Add command handlers
-application.add_handler(CommandHandler("erasecollection", erase_collection, block=False))
-application.add_handler(CommandHandler("addchar", add_character, block=False))
+application.add_handler(CommandHandler("erase", erase_collection, block=False))
+application.add_handler(CommandHandler("addch", add_character, block=False))

@@ -1,7 +1,6 @@
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 from shivu import user_collection, application, OWNER_ID, sudo_users
-from functools import partial  # ✅ Correct way to pass parameters in async handlers
 
 async def inventory(update: Update, context: CallbackContext) -> None:
     """Shows the user's inventory (Zeni, Chrono Crystals, Tickets, and Exclusive Tokens)."""
@@ -86,7 +85,16 @@ async def modify_inventory(update: Update, context: CallbackContext, add: bool) 
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}", parse_mode="HTML")
 
-# ✅ **Fixed Handlers (Without "Open Shop")**
+# ✅ **Separate handlers for Add & Remove Inventory**
+async def add_inventory(update: Update, context: CallbackContext) -> None:
+    """Command for adding inventory items."""
+    await modify_inventory(update, context, add=True)
+
+async def remove_inventory(update: Update, context: CallbackContext) -> None:
+    """Command for removing inventory items."""
+    await modify_inventory(update, context, add=False)
+
+# ✅ **Fixed Handlers**
 application.add_handler(CommandHandler("inventory", inventory, block=False))
-application.add_handler(CommandHandler("additem", partial(modify_inventory, add=True), block=False))
-application.add_handler(CommandHandler("removeitem", partial(modify_inventory, add=False), block=False))
+application.add_handler(CommandHandler("additem", add_inventory, block=False))
+application.add_handler(CommandHandler("removeitem", remove_inventory, block=False))

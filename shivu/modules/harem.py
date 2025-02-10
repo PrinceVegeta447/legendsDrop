@@ -1,4 +1,4 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from itertools import groupby
 import math
 from html import escape
@@ -28,8 +28,7 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
     for banner in await banners_collection.find({}).to_list(length=None):  
         if 'characters' in banner:  
             for char in banner['characters']:  
-                if char['id'] in [c['id'] for c in user['characters']]:  # If user owns this banner character  
-                
+                if char['id'] in [c['id'] for c in user['characters']]:  
                     banner_characters.append(char)  
 
     # Merge all collected characters  
@@ -80,29 +79,35 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
 
     reply_markup = InlineKeyboardMarkup(keyboard)  
 
+    # ✅ Determine which message to edit
+    message = update.message if update.message else update.callback_query.message
+
     # Display favorite character (or random if none)  
     fav_character = None  
     if 'favorites' in user and user['favorites']:  
         fav_character_id = user['favorites'][0]  
         fav_character = next((c for c in all_characters if c['id'] == fav_character_id), None)  
 
-    # ✅ Fix: Use `callback_query.message` if inside a callback
-    message = update.message if update.message else update.callback_query.message
-
-    # Send image if available  
+    # ✅ Use `edit_message_media` instead of `reply_photo`
     if fav_character and 'file_id' in fav_character:  
-        await message.reply_photo(photo=fav_character['file_id'], parse_mode='HTML', caption=harem_message, reply_markup=reply_markup)
+        await message.edit_media(
+            media=InputMediaPhoto(media=fav_character['file_id'], caption=harem_message, parse_mode="HTML"),
+            reply_markup=reply_markup
+        )
         return  
 
     # If no favorite, send a random character  
     if all_characters:  
         random_character = random.choice(all_characters)
         if 'file_id' in random_character:  
-            await message.reply_photo(photo=random_character['file_id'], parse_mode='HTML', caption=harem_message, reply_markup=reply_markup)
+            await message.edit_media(
+                media=InputMediaPhoto(media=random_character['file_id'], caption=harem_message, parse_mode="HTML"),
+                reply_markup=reply_markup
+            )
             return  
 
     # Send text message if no image available  
-    await message.edit_text(harem_message, parse_mode='HTML', reply_markup=reply_markup)
+    await message.edit_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
 
 async def harem_callback(update: Update, context: CallbackContext) -> None:
     """Handles pagination when navigating through harem pages."""
@@ -115,8 +120,7 @@ async def harem_callback(update: Update, context: CallbackContext) -> None:
         await query.answer("❌ This is not your Collection!", show_alert=True)  
         return  
 
-    # Edit the existing message instead of sending a new one
-    message = query.message
+    # ✅ Instead of sending a new message, edit the existing one
     await harem(update, context, page)
 
 

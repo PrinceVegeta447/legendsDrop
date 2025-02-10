@@ -216,8 +216,66 @@ async def market_help(update: Update, context: CallbackContext) -> None:
     )
     await update.message.reply_text(help_message, parse_mode="HTML")
 
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
+from shivu import application, user_collection, market_collection
+from bson import ObjectId
+import math
 
+# ✅ View Active Listings
+async def listings(update: Update, context: CallbackContext) -> None:
+    """Displays a user's active market listings."""
+    user_id = update.effective_user.id
 
+    active_listings = await market_collection.find({"seller_id": user_id}).to_list(length=None)
+    if not active_listings:
+        await update.message.reply_text("❌ *You have no active listings!*", parse_mode="Markdown")
+        return
+
+    message = f"🛒 *Your Active Listings ({len(active_listings)})*\n━━━━━━━━━━━━━━━━━━\n"
+    for listing in active_listings:
+        char = listing["character"]
+        rarity = char.get("rarity", "Unknown")
+
+        message += (
+            f"🎴 *{char['name']}* | 🆔 `{listing['_id']}`\n"
+            f"🎖 *Rarity:* `{rarity}`\n"
+            f"💰 *Price:* `{listing['price']} {listing['currency'].capitalize()}`\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+        )
+
+    message += "🚫 *Use* `/mremove <listing_id>` *to remove a listing.*"
+    await update.message.reply_text(message, parse_mode="Markdown")
+
+# ✅ Remove a Listing
+async def remove_listing(update: Update, context: CallbackContext) -> None:
+    """Removes a character from the market and returns it to the seller's collection."""
+    user_id = update.effective_user.id
+
+    if len(context.args) != 1:
+        await update.message.reply_text("❌ *Usage:* `/mremove <listing_id>`", parse_mode="Markdown")
+        return
+
+    listing_id = context.args[0]
+    try:
+        listing = await market_collection.find_one({"_id": ObjectId(listing_id), "seller_id": user_id})
+        if not listing:
+            await update.message.reply_text("❌ *Invalid Listing ID!*", parse_mode="Markdown")
+            return
+    except:
+        await update.message.reply_text("❌ *Invalid Listing ID format!*", parse_mode="Markdown")
+        return
+
+    # ✅ Remove listing and return character to seller
+    await market_collection.delete_one({"_id": ObjectId(listing_id)})
+    await user_collection.update_one({"id": user_id}, {"$push": {"characters": listing["character"]}})
+
+    await update.message.reply_text(
+        f"✅ *Listing Removed!*\n"
+        f"🎴 *Character:* `{listing['character']['name']}`\n"
+        f"🔹 The character has been returned to your collection.",
+        parse_mode="Markdown"
+    )
 
 # ✅ Register Handlers
 application.add_handler(CommandHandler("market", market, block=False))
@@ -225,3 +283,5 @@ application.add_handler(CallbackQueryHandler(market_callback, pattern="^market:"
 application.add_handler(CommandHandler("mbuy", buy_character, block=False))
 application.add_handler(CommandHandler("msell", sell, block=False))
 application.add_handler(CommandHandler("mhelp", market_help, block=False))
+application.add_handler(CommandHandler("listings", listings, block=False))
+application.add_handler(CommandHandler("mremove", remove_listing, block=False))

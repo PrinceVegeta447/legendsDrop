@@ -6,7 +6,7 @@ from shivu import application, user_collection, collection, OWNER_ID, sudo_users
 import random
 
 # 📌 Claim Limits
-MAX_CLAIMS = 2  # 2 claims per day for normal users
+MAX_CLAIMS = 2  # Normal users get 2 claims per day
 COOLDOWN_TIME = 6 * 60 * 60  # 6 hours in seconds
 GIF_FILE_ID = "BQACAgUAAyEFAASS4tX2AAID1mepm3uPxHquFb9fbSrmnbKjhGqYAAK3FAAC1ftIVUrVTH-TVNlXNgQ"
 
@@ -16,20 +16,19 @@ async def claim(update: Update, context: CallbackContext) -> None:
     user = await user_collection.find_one({"id": user_id}) or {}
 
     # ✅ Initialize claim data if missing
-    user.setdefault("claims", 0)
-    user.setdefault("last_claim", 0)
+    claims = user.get("claims", 0)
+    last_claim = user.get("last_claim", 0)
 
     current_time = time.time()
+    is_admin = user_id == OWNER_ID or user_id in sudo_users  # ✅ Only admins get unlimited claims
 
-    # ✅ **Infinite Claims for Owner & Sudo Users**
-    is_admin = user_id == OWNER_ID or user_id in sudo_users
-
+    # ✅ **Normal Users: Check Claim Limits**
     if not is_admin:
-        if user["claims"] >= MAX_CLAIMS:
+        if claims >= MAX_CLAIMS:
             await update.message.reply_text("❌ You have reached your daily claim limit (2/2). Try again tomorrow!")
             return
 
-        cooldown_remaining = COOLDOWN_TIME - (current_time - user["last_claim"])
+        cooldown_remaining = COOLDOWN_TIME - (current_time - last_claim)
         if cooldown_remaining > 0:
             hours = int(cooldown_remaining // 3600)
             minutes = int((cooldown_remaining % 3600) // 60)
@@ -51,11 +50,11 @@ async def claim(update: Update, context: CallbackContext) -> None:
     await asyncio.sleep(7)
 
     # ✅ Add character to user's collection
-    update_data = {"$push": {"characters": random_character}}
-    if not is_admin:
-        update_data.update({"$set": {"last_claim": current_time}, "$inc": {"claims": 1}})
-
-    await user_collection.update_one({"id": user_id}, update_data)
+    await user_collection.update_one({"id": user_id}, {
+        "$push": {"characters": random_character},  # ✅ Ensures character is added
+        "$set": {"last_claim": current_time} if not is_admin else {},
+        "$inc": {"claims": 1} if not is_admin else {}  # ✅ Only normal users have limited claims
+    })
 
     # ✅ Prepare Character Message
     char_name = random_character["name"]

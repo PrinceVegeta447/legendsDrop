@@ -80,7 +80,7 @@ async def market(update: Update, context: CallbackContext, page=0) -> None:
     message = f"🛒 **Market Listings - Page {page+1}/{total_pages}**\n━━━━━━━━━━━━━━━━━━\n"
     for listing in listings_page:
         char = listing["character"]
-        rarity = char.get["rarity", "Unknown"]
+        rarity = char.get("rarity", "Unknown")
         message += (
             f"🎴 <b>{char['name']}</b>  |  🆔 <code>{listing['_id']}</code>\n"
             f"🎖 <b>Rarity:</b> <code>{rarity}</code>\n"  # ✅ Display rarity

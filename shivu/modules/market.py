@@ -82,12 +82,13 @@ async def market(update: Update, context: CallbackContext, page=0) -> None:
         char = listing["character"]
         rarity = char.get("rarity", "Unknown")
         message += (
-            f"🎴 <b>{char['name']}</b>  |  🆔 <code>{listing['_id']}</code>\n"
-            f"🎖 <b>Rarity:</b> <code>{rarity}</code>\n"  # ✅ Display rarity
-            f"💰 <b>Price:</b> <code>{listing['price']} {listing['currency'].capitalize()}</code>\n"
-            f"👤 <b>Seller:</b> <code>{listing['seller_id']}</code>\n"
-            "━━━━━━━━━━━━━━━━━━\n"
+    f"🎴 <b>{char['name']}</b>  |  🆔 <code>{listing['_id']}</code>\n"
+    f"🎖 <b>Rarity:</b> {char['rarity']}\n"  # ✅ No `<code>` inside `<b>`
+    f"💰 <b>Price:</b> {listing['price']} {listing['currency'].capitalize()}\n"
+    f"👤 <b>Seller:</b> <code>{listing['seller_id']}</code>\n"
+    "━━━━━━━━━━━━━━━━━━\n"
         )
+        
 
     message += "💰 **Use** `/mbuy <listing_id>` **to purchase a character.**"
 

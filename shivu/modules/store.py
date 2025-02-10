@@ -62,14 +62,14 @@ async def refresh_store(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     user = await user_collection.find_one({"id": user_id}) or {}
     user.setdefault("store_refreshes", 0)
-    user.setdefault("zeni", 0)
+    user.setdefault("coins", 0)
 
     if user["store_refreshes"] < FREE_REFRESH_LIMIT:
         new_store = await generate_store()
         await user_collection.update_one({"id": user_id}, {"$inc": {"store_refreshes": 1}})
         await update.callback_query.answer("✅ Store refreshed for free!", show_alert=True)
-    elif user["zeni"] >= REFRESH_COST:
-        await user_collection.update_one({"id": user_id}, {"$inc": {"zeni": -REFRESH_COST, "store_refreshes": 1}})
+    elif user["coins"] >= REFRESH_COST:
+        await user_collection.update_one({"id": user_id}, {"$inc": {"coins": -REFRESH_COST, "store_refreshes": 1}})
         new_store = await generate_store()
         await update.callback_query.answer(f"✅ Store refreshed! You spent {REFRESH_COST} Zeni.", show_alert=True)
     else:
@@ -79,68 +79,57 @@ async def refresh_store(update: Update, context: CallbackContext) -> None:
     await store(update, context)  # Re-send the updated store
 
 async def buy_store_character(update: Update, context: CallbackContext) -> None:
-    """Allows users to buy a character from the store using Zeni."""
+    """Handles buying a character from the store."""
     user_id = update.effective_user.id
 
     if len(context.args) != 1:
-        await update.message.reply_text("❌ **Usage:** `/storebuy <character_id>`", parse_mode="Markdown")
+        await update.message.reply_text("❌ **Usage:** `/buy <character_id>`", parse_mode="Markdown")
         return
 
     char_id = context.args[0]
 
-    # ✅ Fetch user's data
+    # ✅ Fetch User Data
     user = await user_collection.find_one({"id": user_id}) or {}
-    user.setdefault("zeni", 0)
-    user.setdefault("characters", [])
+    user_coins = int(user.get("coins", 0))  # ✅ Fetches from "coins" instead of "zeni"
 
-    # ✅ Fetch the current store
+    # ✅ Fetch Store Data
     store_data = await store_collection.find_one({})
-    if not store_data or store_data["date"] != time.strftime("%Y-%m-%d"):
-        await update.message.reply_text("❌ **The store has been refreshed. Please check `/store` again.**", parse_mode="Markdown")
+    if not store_data:
+        await update.message.reply_text("❌ **Store is currently empty!**", parse_mode="Markdown")
         return
 
-    # ✅ Find the character in the store
-    character = next((c for c in store_data["characters"] if str(c["id"]) == char_id), None)
+    # ✅ Find the Character in Store
+    character = next((c for c in store_data["characters"] if c["id"] == char_id), None)
     if not character:
-        await update.message.reply_text("❌ **Character not found in today's store!**", parse_mode="Markdown")
+        await update.message.reply_text("❌ **Invalid character ID!**", parse_mode="Markdown")
         return
 
-    rarity = character["rarity"]
-    price = RARITY_PRICES.get(rarity, 999999)  # Fetch price based on rarity
+    price = int(character["price"])
 
-    if user["zeni"] < price:
-        await update.message.reply_text(f"❌ **Not enough Zeni!** You need `{price}`, but you have `{user['zeni']}`.", parse_mode="Markdown")
+    # ✅ Check Zeni Balance
+    if user_coins < price:
+        await update.message.reply_text(
+            f"❌ **Not enough Zeni!** You need `{price}`, but you have `{user_coins}`.",
+            parse_mode="Markdown"
+        )
         return
 
-    # ✅ Prevent duplicate purchases of the same character in the same store rotation
-    if any(c["id"] == char_id for c in user["characters"]):
-        await update.message.reply_text("❌ **You already own this character!**", parse_mode="Markdown")
-        return
-
-    # ✅ Deduct Zeni and add character to user’s collection
+    # ✅ Deduct Zeni & Add Character to Inventory
     await user_collection.update_one(
         {"id": user_id},
-        {"$inc": {"zeni": -price}, "$push": {"characters": character}}
+        {"$inc": {"coins": -price}, "$push": {"characters": character}}
     )
 
-    # ✅ Remove character from store after purchase
-    await store_collection.update_one({}, {"$pull": {"characters": {"id": char_id}}})
-
-    # ✅ Send Purchase Confirmation
-    confirmation_message = (
+    # ✅ Confirm Purchase
+    await update.message.reply_text(
         f"✅ **Purchase Successful!**\n"
         f"🎴 **Character:** {character['name']}\n"
-        f"🎖 **Rarity:** {rarity}\n"
+        f"🎖 **Rarity:** {character['rarity']}\n"
         f"💰 **Price:** {price} Zeni\n"
-        f"🔹 The character has been added to your collection!"
+        f"🔹 The character has been added to your collection!",
+        parse_mode="Markdown"
     )
 
-    if character.get("file_id"):
-        await update.message.reply_photo(photo=character["file_id"], caption=confirmation_message, parse_mode="HTML")
-    elif character.get("img_url"):
-        await update.message.reply_photo(photo=character["img_url"], caption=confirmation_message, parse_mode="HTML")
-    else:
-        await update.message.reply_text(confirmation_message, parse_mode="HTML")
 
 # ✅ **Register Handler**
 application.add_handler(CommandHandler("storebuy", buy_store_character, block=False))

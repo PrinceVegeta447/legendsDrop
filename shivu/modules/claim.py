@@ -65,9 +65,9 @@ async def claim(update: Update, context: CallbackContext) -> None:
     # ✅ Send the character details after the animation
     await update.message.reply_photo(
         photo=character["file_id"],
-        caption=f"🎉 **You Claimed:** {character['name']}!\n"
-                f"🎖 **Rarity:** {character['rarity']}\n"
-                f"🔹 **Category:** {character['category']}\n"
+        caption=f"🎉 **You Claimed:** {character['name']}!\n",
+                f"🎖 **Rarity:** {character['rarity']}\n",
+                f"🔹 **Category:** {character['category']}\n",
         parse_mode="Markdown"
     )
 

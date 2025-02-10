@@ -8,6 +8,7 @@ TICKET_PRICE = 1000  # 1000 Zeni per Summon Ticket
 
 # 📌 **Track Pending Purchases**
 pending_purchases = {}
+shop_sessions = {}  # Stores user who opened the shop
 
 async def shop(update: Update, context: CallbackContext) -> None:
     """Displays the shop menu with better UI & inline buttons."""
@@ -34,32 +35,47 @@ async def shop(update: Update, context: CallbackContext) -> None:
 
     # 🛍 **Shop Buttons**
     keyboard = [
-        [InlineKeyboardButton("💎 Buy Chrono Crystals", callback_data="buy:cc")],
-        [InlineKeyboardButton("🎟 Buy Summon Tickets", callback_data="buy:ticket")],
-        [InlineKeyboardButton("❌ Close Shop", callback_data="close_shop")]
+        [InlineKeyboardButton("💎 Buy Chrono Crystals", callback_data=f"buy:cc:{user_id}")],
+        [InlineKeyboardButton("🎟 Buy Summon Tickets", callback_data=f"buy:ticket:{user_id}")],
+        [InlineKeyboardButton("❌ Close Shop", callback_data=f"close_shop:{user_id}")]
     ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # ✅ Store user's message ID to reply later
+    shop_sessions[user_id] = update.message.message_id
+
     await update.message.reply_text(shop_message, parse_mode="HTML", reply_markup=reply_markup)
 
 async def request_amount(update: Update, context: CallbackContext) -> None:
     """Prompt the user to enter an amount after clicking a button."""
     query = update.callback_query
     user_id = query.from_user.id
+    data_parts = query.data.split(":")
 
-    if query.data == "close_shop":
-        await query.message.delete()
+    if len(data_parts) < 3:
+        await query.answer("❌ Invalid request!", show_alert=True)
         return
 
-    _, item = query.data.split(":")  # Extract "cc" or "ticket"
-    
+    _, item, shop_owner_id = data_parts
+    shop_owner_id = int(shop_owner_id)
+
+    # ✅ **Restrict other users from using the shop buttons**
+    if user_id != shop_owner_id:
+        await query.answer("❌ You can't use someone else's shop!", show_alert=True)
+        return
+
     pending_purchases[user_id] = item  # Store purchase type
 
-    await query.message.reply_text(
-        "🛍 <b>Enter the amount you want to buy:</b>\n\n"
-        "✏️ Type a number in chat (e.g., 10 for 10 units).",
-        parse_mode="HTML"
-    )
+    # ✅ **Reply to the user's original `/shop` command**
+    if shop_owner_id in shop_sessions:
+        await query.message.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="🛍 <b>Enter the amount you want to buy:</b>\n\n"
+                 "✏️ Type a number in chat (e.g., 10 for 10 units).",
+            parse_mode="HTML",
+            reply_to_message_id=shop_sessions[shop_owner_id]
+        )
 
 async def confirm_purchase(update: Update, context: CallbackContext) -> None:
     """Handles the confirmation & finalization of purchase."""
@@ -94,7 +110,7 @@ async def confirm_purchase(update: Update, context: CallbackContext) -> None:
 
     # 📌 **Confirmation Step**
     keyboard = [
-        [InlineKeyboardButton("✅ Confirm", callback_data=f"confirm:{purchase_type}:{amount}")],
+        [InlineKeyboardButton("✅ Confirm", callback_data=f"confirm:{purchase_type}:{amount}:{user_id}")],
         [InlineKeyboardButton("❌ Cancel", callback_data="cancel_purchase")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -116,11 +132,17 @@ async def finalize_purchase(update: Update, context: CallbackContext) -> None:
 
     # ✅ Ensure callback data has the correct format
     data_parts = query.data.split(":")
-    if len(data_parts) < 3:
+    if len(data_parts) < 4:
         await query.answer("❌ Error: Invalid purchase data!", show_alert=True)
         return
 
-    _, purchase_type, amount = data_parts  # Extract data safely
+    _, purchase_type, amount, purchase_owner = data_parts
+    purchase_owner = int(purchase_owner)
+
+    # ✅ Restrict confirmation to the correct user
+    if user_id != purchase_owner:
+        await query.answer("❌ You can't confirm someone else's purchase!", show_alert=True)
+        return
 
     try:
         amount = int(amount)

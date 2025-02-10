@@ -109,15 +109,15 @@ async def upload(update: Update, context: CallbackContext) -> None:
             "7": "🩸 Regeneration",
             "8": "🔀 Fusion Warrior",
             "9": "🤝 Duo",
-            "10": "🔱 Super Saiyan God SS",
-            "11": "🗿 Ultra Instinct Sign",
-            "12": "⚡ Super Saiyan",
-            "13": "❤️‍🔥 Dragon Ball Saga",
-            "14": "💫 Majin Buu Saga",
-            "15": "👾 Cell Saga",
-            "16": "📽️ Sagas From the Movies",
-            "17": "☠️ Lineage Of Evil",
-            "18": "🌏 Universe Survival Saga"
+           "10":"🔱 Super Saiyan God SS",
+           "11": "🗿 Ultra Instinct Sign",
+           "12": "⚡ Super Saiyan",
+           "13": "❤️‍🔥 Dragon Ball Saga",
+           "14": "💫 Majin Buu Saga",
+           "15": "👾 Cell Saga",
+           "16": "📽️ Sagas From the Movies",
+           "17": "☠️ Lineage Of Evil",
+           "18": "🌏 Universe Survival Saga"
         }
         category = category_map.get(category_input)
         if not category:

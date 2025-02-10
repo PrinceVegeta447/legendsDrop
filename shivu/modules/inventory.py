@@ -29,9 +29,7 @@ async def inventory(update: Update, context: CallbackContext) -> None:
         f"🔹 Keep guessing characters to earn more rewards!\n"
     )
 
-    # ✅ Inline Button for Shop Access
-    keyboard = [[InlineKeyboardButton("🛍️ Open Shop", callback_data="open_shop")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+   
 
     await update.message.reply_text(inventory_message, parse_mode="HTML", reply_markup=reply_markup)
 

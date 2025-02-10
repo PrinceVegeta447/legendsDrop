@@ -69,7 +69,7 @@ async def claim(update: Update, context: CallbackContext) -> None:
                 f"🎖 **Rarity:** {character['rarity']}\n",
                 f"🔹 **Category:** {character['category']}\n",
         parse_mode="Markdown"
-    )
+   ) 
 
 # ✅ Register Command
 application.add_handler(CommandHandler("claim", claim, block=False))

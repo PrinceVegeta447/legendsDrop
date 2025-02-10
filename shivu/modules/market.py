@@ -178,42 +178,26 @@ async def market_callback(update: Update, context: CallbackContext) -> None:
     await market(update, context, page)
 
 
-from telegram import Update
-from telegram.ext import CommandHandler, CallbackContext
-from shivu import application
-
 async def market_help(update: Update, context: CallbackContext) -> None:
     """Provides help and instructions for the market system."""
     help_message = (
-        "🏪 <b>Market Guide</b>\n"
+        "🛒 <b>Market Help</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "📌 The market allows users to **sell, browse, and buy characters** using **Zeni** or **Chrono Crystals (CC).**\n\n"
-        "💰 <b>Selling a Character</b>\n"
-        "➜ `/msell <char_id> <price> zeni` - Sell for Zeni.\n"
-        "➜ `/msell <char_id> <price> cc` - Sell for CC.\n"
-        "🔹 Example: `/msell 123 500 zeni`\n"
-        "🔹 You must own **at least 2 copies** of a character to sell it.\n\n"
-        "📜 <b>Viewing Market Listings</b>\n"
-        "➜ `/market` - View available characters for sale.\n"
-        "🔹 The market displays **10 listings per page.**\n"
-        "🔹 Use ⬅️ & ➡️ buttons to navigate.\n\n"
-        "🛍️ <b>Buying a Character</b>\n"
-        "➜ `/mbuy <listing_id>` - Buy a character.\n"
-        "🔹 Example: `/mbuy 65f23abcde`\n"
-        "🔹 Ensure you have **enough Zeni/CC** before purchasing.\n"
-        "🔹 You **cannot buy your own listings.**\n\n"
-        "📦 <b>Viewing Your Listings</b>\n"
-        "➜ `/listings` - See your active sales.\n\n"
-        "🚫 <b>Removing a Listing</b>\n"
-        "➜ `/mremove <listing_id>` - Cancel a listing & get your character back.\n"
-        "🔹 Example: `/mremove 65f23abcde`\n\n"
-        "❓ Need Help? Use `/mhelp` anytime!\n"
-        "🔹 **Start trading now with** `/market`! 🚀"
+        "📌 The Market allows you to sell and buy characters using Zeni or Chrono Crystals.\n\n"
+        "💰 <b>Selling:</b>\n"
+        "➜ <code>/msell char_id price</code> - Sell a character for Zeni.\n"
+        "➜ <code>/msellcc char_id price</code> - Sell for Chrono Crystals.\n\n"
+        "🔎 <b>Browsing:</b>\n"
+        "➜ <code>/market</code> - View all available listings.\n"
+        "➜ <code>/mylistings</code> - View your own listings.\n\n"
+        "🛒 <b>Buying:</b>\n"
+        "➜ <code>/mbuy listing_id</code> - Buy a character from the market.\n\n"
+        "🚫 <b>Removing a Listing:</b>\n"
+        "➜ <code>/mremove listing_id</code> - Remove your character from the market.\n\n"
+        "Use <code>/market</code> to start browsing!"
     )
-
     await update.message.reply_text(help_message, parse_mode="HTML")
 
-# ✅ Register `/mhelp` Command Handler
 
 
 

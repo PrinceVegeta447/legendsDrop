@@ -66,31 +66,38 @@ async def sell(update: Update, context: CallbackContext) -> None:
 
 
 # ✅ View Market Listings (Paginated)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
+from shivu import application, user_collection, market_collection
+from bson import ObjectId
+import math
+
+# ✅ View Market Listings (Paginated)
 async def market(update: Update, context: CallbackContext, page=0) -> None:
     """Displays all available characters for sale (Paginated)."""
     listings = await market_collection.find({}).to_list(length=None)
     if not listings:
-        await update.message.reply_text("❌ **No characters are currently for sale!**", parse_mode="Markdown")
+        await update.message.reply_text("❌ *No characters are currently for sale!*", parse_mode="Markdown")
         return
 
     total_pages = math.ceil(len(listings) / 10)  # 10 Listings per page
     page = max(0, min(page, total_pages - 1))
     listings_page = listings[page * 10: (page + 1) * 10]
 
-    message = f"🛒 **Market Listings - Page {page+1}/{total_pages}**\n━━━━━━━━━━━━━━━━━━\n"
+    message = f"🛒 *Market Listings - Page {page+1}/{total_pages}*\n━━━━━━━━━━━━━━━━━━\n"
     for listing in listings_page:
         char = listing["character"]
-        rarity = char.get("rarity", "Unknown")
-        message += (
-    f"🎴 <b>{char['name']}</b>  |  🆔 <code>{listing['_id']}</code>\n"
-    f"🎖 <b>Rarity:</b> {char['rarity']}\n"  # ✅ No `<code>` inside `<b>`
-    f"💰 <b>Price:</b> {listing['price']} {listing['currency'].capitalize()}\n"
-    f"👤 <b>Seller:</b> <code>{listing['seller_id']}</code>\n"
-    "━━━━━━━━━━━━━━━━━━\n"
-        )
-        
+        rarity = char.get("rarity", "Unknown")  # ✅ Get Rarity Properly
 
-    message += "💰 **Use** `/mbuy <listing_id>` **to purchase a character.**"
+        message += (
+            f"🎴 *{char['name']}*  |  🆔 `{listing['_id']}`\n"
+            f"🎖 *Rarity:* `{rarity}`\n"
+            f"💰 *Price:* `{listing['price']} {listing['currency'].capitalize()}`\n"
+            f"👤 *Seller:* `{listing['seller_id']}`\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+        )
+
+    message += "💰 *Use* `/mbuy <listing_id>` *to purchase a character.*"
 
     # ✅ Pagination Buttons
     keyboard = []
@@ -108,6 +115,15 @@ async def market(update: Update, context: CallbackContext, page=0) -> None:
         await update.message.reply_text(message, parse_mode="Markdown", reply_markup=reply_markup)
     else:
         await update.callback_query.edit_message_text(message, parse_mode="Markdown", reply_markup=reply_markup)
+
+# ✅ Pagination Callback
+async def market_callback(update: Update, context: CallbackContext) -> None:
+    """Handles market pagination."""
+    query = update.callback_query
+    _, page = query.data.split(":")
+    page = int(page)
+
+    await market(update, context, page)
 
 
 # ✅ Buy Character using Command

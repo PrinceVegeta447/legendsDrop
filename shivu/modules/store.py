@@ -14,7 +14,10 @@ RARITY_PRICES = {
     "🟡 Sparking": 100000,
     "🔱 Ultra": 250000
 }
-CATEGORIES = {
+FREE_REFRESH_LIMIT = 1
+REFRESH_COST = 25000  # Cost after free refresh is used
+
+CATEGORY_MAPPING = {
     "1": "🏆 Saiyan",
     "2": "🔥 Hybrid Saiyan",
     "3": "🤖 Android",
@@ -34,11 +37,9 @@ CATEGORIES = {
    "17": "☠️ Lineage Of Evil",
    "18": "🌏 Universe Survival Saga"
 }
-FREE_REFRESH_LIMIT = 1
-REFRESH_COST = 25000  # Cost after free refresh is used
 
 async def generate_store():
-    """Generates a new daily store with 10 random characters, avoiding excluded rarities."""
+    """Generates a new daily store with 10 random characters from the `collection` database."""
     available_characters = await collection.find({"rarity": {"$nin": EXCLUDED_RARITIES}}).to_list(None)
     if len(available_characters) < 10:
         return []  # Not enough characters
@@ -47,11 +48,15 @@ async def generate_store():
     selected_characters = random.sample(available_characters, 10)  # Select 10 random characters
 
     for char in selected_characters:
-        price = RARITY_PRICES.get(char.get("rarity", "Unknown"), 999999)  # Assign price
-        category = CATEGORIES.get(str(char.get("category", "Unknown")), "Unknown")  # Assign category safely
-        char["price"] = price
-        char["category"] = category
-        store.append(char)
+        price = RARITY_PRICES.get(char["rarity"], 999999)  # Assign price based on rarity
+        char_data = {
+            "id": char["id"],
+            "name": char["name"],
+            "rarity": char["rarity"],
+            "category": CATEGORY_MAPPING.get(char.get("category"), "Unknown"),
+            "price": price
+        }
+        store.append(char_data)
 
     # ✅ Save Store to Database
     await store_collection.delete_many({})
@@ -77,24 +82,17 @@ async def store(update: Update, context: CallbackContext) -> None:
         return
 
     store_message = "<b>🛒 Today's Character Store</b>\n━━━━━━━━━━━━━━━━━━━━\n"
-
-    for char in characters:  # ✅ Correct indentation for loop
-        category = char.get("category", "Unknown")  # ✅ Prevent KeyError
-        price = char.get("price", "N/A")  # ✅ Prevent KeyError
-        
+    for char in characters:
         store_message += (
             f"{char['rarity']} <b>{char['name']}</b>\n"
-            f"🏷 <b>Category:</b> {category}\n"
-            f"💰 <b>Price:</b> {price} Zeni\n"
+            f"🏷 <b>Category:</b> {char['category']}\n"
+            f"💰 <b>Price:</b> {char['price']} Zeni\n"
             f"🆔 Character ID: <code>{char['id']}</code>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
         )
 
-    # ✅ Append commands only once after the loop
-    store_message += (
-        "\n🔹 Use <code>/refreshstore</code> to refresh the store.\n"
-        "💰 Use <code>/storebuy &lt;character_id&gt;</code> to purchase a character."
-    )
+    store_message += "🔹 Use `/refreshstore` to refresh the store.\n"
+    store_message += "💰 Use `/storebuy <character_id>` to purchase a character."
 
     await update.message.reply_text(store_message, parse_mode="HTML")
 

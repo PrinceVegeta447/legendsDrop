@@ -77,18 +77,24 @@ async def store(update: Update, context: CallbackContext) -> None:
         return
 
     store_message = "<b>🛒 Today's Character Store</b>\n━━━━━━━━━━━━━━━━━━━━\n"
-for char in characters:
-    category = char.get("category", "Unknown")
-    store_message += (
-        f"{char['rarity']} <b>{char['name']}</b>\n"
-        f"🏷 <b>Category:</b> {category}\n"
-        f"💰 <b>Price:</b> {char['price']} Zeni\n"
-        f"🆔 Character ID: <code>{char['id']}</code>\n"  # ✅ Fix here
-        "━━━━━━━━━━━━━━━━━━━━\n"
-    )
 
-    store_message += "🔹 Use `/refreshstore` to refresh the store.\n"
-    store_message += "💰 Use `/storebuy <character_id>` to purchase a character."
+    for char in characters:  # ✅ Correct indentation for loop
+        category = char.get("category", "Unknown")  # ✅ Prevent KeyError
+        price = char.get("price", "N/A")  # ✅ Prevent KeyError
+        
+        store_message += (
+            f"{char['rarity']} <b>{char['name']}</b>\n"
+            f"🏷 <b>Category:</b> {category}\n"
+            f"💰 <b>Price:</b> {price} Zeni\n"
+            f"🆔 Character ID: <code>{char['id']}</code>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+        )
+
+    # ✅ Append commands only once after the loop
+    store_message += (
+        "\n🔹 Use <code>/refreshstore</code> to refresh the store.\n"
+        "💰 Use <code>/storebuy &lt;character_id&gt;</code> to purchase a character."
+    )
 
     await update.message.reply_text(store_message, parse_mode="HTML")
 

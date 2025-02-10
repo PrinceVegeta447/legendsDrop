@@ -6,9 +6,9 @@ from shivu import application, user_collection
 CC_PRICE = 500       # 500 Zeni per Chrono Crystal
 TICKET_PRICE = 1000  # 1000 Zeni per Summon Ticket
 
-# 📌 **Track Pending Purchases**
-pending_purchases = {}
-shop_sessions = {}  # Stores user who opened the shop
+# 📌 **Track Sessions & Purchases**
+pending_purchases = {}  # Tracks purchase type (cc/ticket)
+shop_sessions = {}       # Tracks user who opened the shop
 
 async def shop(update: Update, context: CallbackContext) -> None:
     """Displays the shop menu with better UI & inline buttons."""
@@ -69,7 +69,7 @@ async def request_amount(update: Update, context: CallbackContext) -> None:
 
     # ✅ **Reply to the user's original `/shop` command**
     if shop_owner_id in shop_sessions:
-        await query.message.bot.send_message(
+        await context.bot.send_message(
             chat_id=query.message.chat_id,
             text="🛍 <b>Enter the amount you want to buy:</b>\n\n"
                  "✏️ Type a number in chat (e.g., 10 for 10 units).",
@@ -111,7 +111,7 @@ async def confirm_purchase(update: Update, context: CallbackContext) -> None:
     # 📌 **Confirmation Step**
     keyboard = [
         [InlineKeyboardButton("✅ Confirm", callback_data=f"confirm:{purchase_type}:{amount}:{user_id}")],
-        [InlineKeyboardButton("❌ Cancel", callback_data="cancel_purchase")]
+        [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel:{user_id}")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -129,9 +129,8 @@ async def finalize_purchase(update: Update, context: CallbackContext) -> None:
     """Process the purchase after user confirms."""
     query = update.callback_query
     user_id = query.from_user.id
-
-    # ✅ Ensure callback data has the correct format
     data_parts = query.data.split(":")
+
     if len(data_parts) < 4:
         await query.answer("❌ Error: Invalid purchase data!", show_alert=True)
         return
@@ -150,7 +149,6 @@ async def finalize_purchase(update: Update, context: CallbackContext) -> None:
         await query.answer("❌ Invalid amount!", show_alert=True)
         return
 
-    # ✅ Fetch user data
     user = await user_collection.find_one({'id': user_id}) or {}
     coins = user.get('coins', 0)
     price = CC_PRICE if purchase_type == "cc" else TICKET_PRICE
@@ -173,14 +171,8 @@ async def finalize_purchase(update: Update, context: CallbackContext) -> None:
         parse_mode="HTML"
     )
 
-async def cancel_purchase(update: Update, context: CallbackContext) -> None:
-    """Cancels the purchase process."""
-    query = update.callback_query
-    await query.message.edit_text("❌ <b>Purchase Cancelled.</b>", parse_mode="HTML")
-
-# ✅ **Add Handlers**
+# ✅ **Handlers**
 application.add_handler(CommandHandler("shop", shop, block=False))
 application.add_handler(CallbackQueryHandler(request_amount, pattern="^buy:", block=False))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_purchase))
 application.add_handler(CallbackQueryHandler(finalize_purchase, pattern="^confirm:", block=False))
-application.add_handler(CallbackQueryHandler(cancel_purchase, pattern="^cancel_purchase$", block=False))

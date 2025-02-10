@@ -1,5 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CommandHandler, CallbackContext
+from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
 from shivu import application, banners_collection, OWNER_ID, sudo_users
 from bson import ObjectId
 

@@ -122,7 +122,7 @@ async def market_callback(update: Update, context: CallbackContext) -> None:
 
 # ✅ Buy Character (Fixed Currency Deduction)
 async def buy_character(update: Update, context: CallbackContext) -> None:
-    """Handles buying a character from the market."""
+    """Handles buying a character from the market and notifies the seller."""
     user_id = update.effective_user.id
 
     if len(context.args) != 1:
@@ -148,31 +148,44 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ **You cannot buy your own listing!**", parse_mode="Markdown")
         return
 
-    # ✅ Fetch buyer data
+    # Fetch buyer data
     buyer = await user_collection.find_one({"id": user_id})
     if not buyer:
         await update.message.reply_text("❌ **You need to guess characters first!**", parse_mode="Markdown")
         return
 
-    # ✅ Correctly fetch the balance
-    balance_field = "chrono_crystals" if currency == "cc" else "coins"
-    buyer_balance = buyer.get(balance_field, 0)
-
+    buyer_balance = buyer.get(currency, 0)
     if buyer_balance < price:
-        await update.message.reply_text(f"❌ **Not enough {currency.capitalize()}!** You need {price} but have {buyer_balance}.", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ **Not enough {currency.capitalize()}!**", parse_mode="Markdown")
         return
 
-    # ✅ Deduct currency from buyer & add character
+    # Deduct currency from buyer & add character
     await user_collection.update_one({"id": user_id}, {
-        "$inc": {balance_field: -price},
+        "$inc": {currency: -price},
         "$push": {"characters": char}
     })
 
-    # ✅ Transfer currency to seller
-    await user_collection.update_one({"id": seller_id}, {"$inc": {balance_field: price}})
+    # Transfer currency to seller
+    await user_collection.update_one({"id": seller_id}, {"$inc": {currency: price}})
 
-    # ✅ Remove listing from market
+    # Remove listing
     await market_collection.delete_one({"_id": ObjectId(listing_id)})
+
+    # ✅ **Notify the Seller**
+    try:
+        seller_message = (
+            f"📢 <b>Your Character Has Been Sold!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🎴 <b>Character:</b> {char['name']}\n"
+            f"🎖 <b>Rarity:</b> {char.get('rarity', 'Unknown')}\n"
+            f"💰 <b>Sold for:</b> {price} {currency.capitalize()}\n"
+            f"👤 <b>Buyer:</b> @{update.effective_user.username if update.effective_user.username else 'Unknown'}\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🔹 Use /market to list more characters!"
+        )
+        await context.bot.send_message(chat_id=seller_id, text=seller_message, parse_mode="HTML")
+    except Exception as e:
+        print(f"❌ Failed to notify seller {seller_id}: {str(e)}")
 
     await update.message.reply_text(
         f"✅ **Purchase Successful!**\n"
@@ -180,7 +193,7 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         f"💰 **Price:** {price} {currency.capitalize()}\n"
         f"🔹 The character has been added to your collection!",
         parse_mode="Markdown"
-    )
+        )
 
 
 async def market_help(update: Update, context: CallbackContext) -> None:

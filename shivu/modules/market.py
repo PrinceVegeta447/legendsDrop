@@ -139,7 +139,7 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         return
 
     char = listing["character"]
-    price = listing["price"]
+    price = int(listing["price"])
     currency = listing["currency"]
     seller_id = listing["seller_id"]
 
@@ -154,8 +154,8 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         return
 
     # ✅ **Fix Currency Deduction Issue**
-    buyer_balance = buyer.get(currency, 0)
-    if int(buyer_balance) < int(price):
+    buyer_balance = int(buyer.get(currency, 0))
+    if buyer_balance < price:
         await update.message.reply_text(
             f"❌ **Not enough {currency.capitalize()}!** You need `{price}`, but you have `{buyer_balance}`.",
             parse_mode="Markdown"
@@ -164,15 +164,25 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
 
     # ✅ Deduct currency from buyer & add character
     await user_collection.update_one({"id": user_id}, {
-        "$inc": {currency: -int(price)},
+        "$inc": {currency: -price},
         "$push": {"characters": char}
     })
 
     # ✅ Transfer currency to seller
-    await user_collection.update_one({"id": seller_id}, {"$inc": {currency: int(price)}})
+    await user_collection.update_one({"id": seller_id}, {"$inc": {currency: price}})
 
     # ✅ Remove listing
     await market_collection.delete_one({"_id": ObjectId(listing_id)})
+
+    # ✅ **Log the Transaction**
+    await transaction_logs.insert_one({
+        "buyer_id": user_id,
+        "seller_id": seller_id,
+        "character": char,
+        "price": price,
+        "currency": currency,
+        "timestamp": math.floor(time.time())
+    })
 
     # ✅ **Notify the Seller**
     try:
@@ -182,7 +192,7 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
             f"🎴 <b>Character:</b> {char['name']}\n"
             f"🎖 <b>Rarity:</b> {char.get('rarity', 'Unknown')}\n"
             f"💰 <b>Sold for:</b> {price} {currency.capitalize()}\n"
-            f"👤 <b>Buyer:</b> @{update.effective_user.username if update.effective_user.username else 'Unknown'}\n"
+            f"👤 <b>Buyer:</b> @{update.effective_user.username or 'Unknown'}\n"
             f"━━━━━━━━━━━━━━━━━━\n"
             f"🔹 Use /market to list more characters!"
         )
@@ -190,14 +200,15 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
     except Exception as e:
         print(f"❌ Failed to notify seller {seller_id}: {str(e)}")
 
+    # ✅ **Notify the Buyer**
     await update.message.reply_text(
         f"✅ **Purchase Successful!**\n"
         f"🎴 **Character:** {char['name']}\n"
+        f"🎖 **Rarity:** {char.get('rarity', 'Unknown')}\n"
         f"💰 **Price:** {price} {currency.capitalize()}\n"
         f"🔹 The character has been added to your collection!",
         parse_mode="Markdown"
-        )
-    
+    )
     
 
 

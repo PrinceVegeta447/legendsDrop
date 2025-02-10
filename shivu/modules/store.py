@@ -24,7 +24,7 @@ CATEGORIES = {
     "7": "🩸 Regeneration",
     "8": "🔀 Fusion Warrior",
     "9": "🤝 Duo",
-   "10": "🔱 Super Saiyan God SS", 
+   "10": "🔱 Super Saiyan God SS",
    "11": "🗿 Ultra Instinct Sign",
    "12": "⚡ Super Saiyan",
    "13": "❤️‍🔥 Dragon Ball Saga",
@@ -47,8 +47,8 @@ async def generate_store():
     selected_characters = random.sample(available_characters, 10)  # Select 10 random characters
 
     for char in selected_characters:
-        price = RARITY_PRICES.get(char["rarity"], 999999)  # Assign price
-        category = CATEGORIES.get(char.get("category", "Unknown"), "Unknown")  # Assign category
+        price = RARITY_PRICES.get(char.get("rarity", "Unknown"), 999999)  # Assign price
+        category = CATEGORIES.get(str(char.get("category", "Unknown")), "Unknown")  # Assign category safely
         char["price"] = price
         char["category"] = category
         store.append(char)
@@ -78,9 +78,10 @@ async def store(update: Update, context: CallbackContext) -> None:
 
     store_message = "<b>🛒 Today's Character Store</b>\n━━━━━━━━━━━━━━━━━━━━\n"
     for char in characters:
+        category = char.get("category", "Unknown")  # Avoid KeyError
         store_message += (
             f"{char['rarity']} {char['id']} <b>{char['name']}</b>\n"
-            f"🏷 <b>Category:</b> {char['category']}\n"
+            f"🏷 <b>Category:</b> {category}\n"
             f"💰 <b>Price:</b> <code>{char['price']} Zeni</code>\n━━━━━━━━━━━━━━━━━━━━\n"
         )
 

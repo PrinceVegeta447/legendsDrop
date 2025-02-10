@@ -6,8 +6,8 @@ from html import escape
 from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
 from shivu import collection, user_collection, application, db
 
-# ✅ Sorting Options: Default to Category
-DEFAULT_SORT = "category"  
+# ✅ Default Sorting Option
+DEFAULT_SORT = "category"
 
 async def harem(update: Update, context: CallbackContext, page=0) -> None:
     """Displays the user's character collection with sorting and pagination."""
@@ -37,7 +37,7 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
     unique_characters = list({char["id"]: char for char in characters}.values())
 
     # ✅ Pagination
-    total_pages = math.ceil(len(unique_characters) / 15)
+    total_pages = max(1, math.ceil(len(unique_characters) / 15))  # Ensure at least 1 page
     page = max(0, min(page, total_pages - 1))
 
     # ✅ Harem Header
@@ -83,27 +83,14 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
 
     message = update.message if update.message else update.callback_query.message
 
-    # ✅ If editing an existing message, use `edit_message_caption()`
-    try:
-        if fav_character and "file_id" in fav_character:
-            await message.edit_media(
-                media={"type": "photo", "media": fav_character["file_id"]},
-                reply_markup=reply_markup
-            )
-            await message.edit_caption(harem_message, parse_mode="HTML", reply_markup=reply_markup)
+    if fav_character and "file_id" in fav_character:
+        await message.reply_photo(photo=fav_character["file_id"], parse_mode="HTML", caption=harem_message, reply_markup=reply_markup)
+    else:
+        random_character = random.choice(user["characters"]) if user["characters"] else None
+        if random_character and "file_id" in random_character:
+            await message.reply_photo(photo=random_character["file_id"], parse_mode="HTML", caption=harem_message, reply_markup=reply_markup)
         else:
-            random_character = random.choice(user["characters"]) if user["characters"] else None
-            if random_character and "file_id" in random_character:
-                await message.edit_media(
-                    media={"type": "photo", "media": random_character["file_id"]},
-                    reply_markup=reply_markup
-                )
-                await message.edit_caption(harem_message, parse_mode="HTML", reply_markup=reply_markup)
-            else:
-                await message.edit_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
-    except:
-        # ✅ If editing fails, send a new message instead
-        await message.reply_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
+            await message.edit_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
 
 async def harem_callback(update: Update, context: CallbackContext) -> None:
     """Handles pagination when navigating through harem pages."""

@@ -84,11 +84,11 @@ async def store(update: Update, context: CallbackContext) -> None:
     store_message = "<b>🛒 Today's Character Store</b>\n━━━━━━━━━━━━━━━━━━━━\n"
     for char in characters:
         store_message += (
-            f"{char['rarity']} <b>{char['name']}</b>\n"
-            f"🏷 <b>Category:</b> {char['category']}\n"
-            f"💰 <b>Price:</b> {char['price']} Zeni\n"
-            f"🆔 <b>Character ID:</b> {char['id']}\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
+    f"{char['rarity']} <b>{char['name']}</b>\n"
+    f"🏷 <b>Category:</b> {char['category']}\n"
+    f"💰 <b>Price:</b> {char['price']} Zeni\n"
+    f"🆔 <b>Character ID:</b> <code>{char['id']}</code>\n"  # ✅ Fixed formatting
+    "━━━━━━━━━━━━━━━━━━━━\n"
         )
 
     store_message += "🔹 Use `/refreshstore` to refresh the store.\n"

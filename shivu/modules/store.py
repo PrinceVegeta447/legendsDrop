@@ -87,7 +87,7 @@ async def store(update: Update, context: CallbackContext) -> None:
             f"{char['rarity']} <b>{char['name']}</b>\n"
             f"🏷 <b>Category:</b> {char['category']}\n"
             f"💰 <b>Price:</b> {char['price']} Zeni\n"
-            f"🆔 Character ID: <code>{char['id']}</code>\n"
+            f"🆔 <b>Character ID:</b> {char['id']}\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
         )
 

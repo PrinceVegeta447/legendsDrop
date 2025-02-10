@@ -4,7 +4,7 @@ from shivu import application, user_collection, market_collection
 from bson import ObjectId
 import math
 
-# ✅ Sell a Character
+# ✅ Sell a Character (Fixed Listing Removal)
 async def sell(update: Update, context: CallbackContext) -> None:
     """Allows users to sell a duplicate character."""
     user_id = update.effective_user.id
@@ -27,25 +27,28 @@ async def sell(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ **Invalid currency!** Choose `zeni` or `cc`.", parse_mode="Markdown")
         return
 
-    # Fetch user data
+    # ✅ Fetch user data
     user = await user_collection.find_one({"id": user_id})
     if not user or "characters" not in user:
         await update.message.reply_text("❌ **You don't have any characters to sell!**", parse_mode="Markdown")
         return
 
-    # Count occurrences of the character
+    # ✅ Count occurrences of the character
     char_count = sum(1 for c in user["characters"] if c["id"] == char_id)
     if char_count < 2:
         await update.message.reply_text("❌ **You can only sell duplicates!**", parse_mode="Markdown")
         return
 
-    # Fetch character details
+    # ✅ Fetch character details
     character = next((c for c in user["characters"] if c["id"] == char_id), None)
     if not character:
         await update.message.reply_text("❌ **Invalid character ID!**", parse_mode="Markdown")
         return
 
-    # Create a market listing
+    # ✅ Remove character from user's collection
+    await user_collection.update_one({"id": user_id}, {"$pull": {"characters": {"id": char_id}}})
+
+    # ✅ Create a market listing
     listing = {
         "seller_id": user_id,
         "character": character,
@@ -64,14 +67,6 @@ async def sell(update: Update, context: CallbackContext) -> None:
         parse_mode="Markdown"
     )
 
-
-# ✅ View Market Listings (Paginated)
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
-from shivu import application, user_collection, market_collection
-from bson import ObjectId
-import math
-
 # ✅ View Market Listings (Paginated)
 async def market(update: Update, context: CallbackContext, page=0) -> None:
     """Displays all available characters for sale (Paginated)."""
@@ -87,10 +82,10 @@ async def market(update: Update, context: CallbackContext, page=0) -> None:
     message = f"🛒 *Market Listings - Page {page+1}/{total_pages}*\n━━━━━━━━━━━━━━━━━━\n"
     for listing in listings_page:
         char = listing["character"]
-        rarity = char.get("rarity", "Unknown")  # ✅ Get Rarity Properly
+        rarity = char.get("rarity", "Unknown")
 
         message += (
-            f"🎴 *{char['name']}*  |  🆔 `{listing['_id']}`\n"
+            f"🎴 *{char['name']}* | 🆔 `{listing['_id']}`\n"
             f"🎖 *Rarity:* `{rarity}`\n"
             f"💰 *Price:* `{listing['price']} {listing['currency'].capitalize()}`\n"
             f"👤 *Seller:* `{listing['seller_id']}`\n"
@@ -116,17 +111,7 @@ async def market(update: Update, context: CallbackContext, page=0) -> None:
     else:
         await update.callback_query.edit_message_text(message, parse_mode="Markdown", reply_markup=reply_markup)
 
-# ✅ Pagination Callback
-async def market_callback(update: Update, context: CallbackContext) -> None:
-    """Handles market pagination."""
-    query = update.callback_query
-    _, page = query.data.split(":")
-    page = int(page)
-
-    await market(update, context, page)
-
-
-# ✅ Buy Character using Command
+# ✅ Buy Character (Fixed Currency Deduction)
 async def buy_character(update: Update, context: CallbackContext) -> None:
     """Handles buying a character from the market."""
     user_id = update.effective_user.id
@@ -154,27 +139,29 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ **You cannot buy your own listing!**", parse_mode="Markdown")
         return
 
-    # Fetch buyer data
+    # ✅ Fetch buyer data
     buyer = await user_collection.find_one({"id": user_id})
     if not buyer:
         await update.message.reply_text("❌ **You need to guess characters first!**", parse_mode="Markdown")
         return
 
     buyer_balance = buyer.get(currency, 0)
+
+    # ✅ Check if buyer has enough currency
     if buyer_balance < price:
-        await update.message.reply_text(f"❌ **Not enough {currency.capitalize()}!**", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ **Not enough {currency.capitalize()}!** You need `{price}` but have `{buyer_balance}`.", parse_mode="Markdown")
         return
 
-    # Deduct currency from buyer & add character
+    # ✅ Deduct currency from buyer & add character
     await user_collection.update_one({"id": user_id}, {
         "$inc": {currency: -price},
         "$push": {"characters": char}
     })
 
-    # Transfer currency to seller
+    # ✅ Transfer currency to seller
     await user_collection.update_one({"id": seller_id}, {"$inc": {currency: price}})
 
-    # Remove listing
+    # ✅ Remove listing
     await market_collection.delete_one({"_id": ObjectId(listing_id)})
 
     await update.message.reply_text(
@@ -185,15 +172,6 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         parse_mode="Markdown"
     )
 
-
-# ✅ Pagination Callback
-async def market_callback(update: Update, context: CallbackContext) -> None:
-    """Handles market pagination."""
-    query = update.callback_query
-    _, page = query.data.split(":")
-    page = int(page)
-
-    await market(update, context, page)
 
 
 async def market_help(update: Update, context: CallbackContext) -> None:

@@ -3,37 +3,48 @@ import time
 import random
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
-from shivu import application, user_collection, collection, OWNER_ID, sudo_users
+from shivu import application, user_collection, collection
 
 # 📌 Claim Limits
-MAX_CLAIMS = 1  # Normal users get 2 claims per day
-COOLDOWN_TIME = 24 * 60 * 60  # 6 hours in seconds
+MAX_CLAIMS = 1  # Users can claim once per day
+COOLDOWN_TIME = 24 * 60 * 60  # 24 hours cooldown
 GIF_FILE_ID = "BQACAgUAAyEFAASS4tX2AAID1mepm3uPxHquFb9fbSrmnbKjhGqYAAK3FAAC1ftIVUrVTH-TVNlXNgQ"
 
 async def claim(update: Update, context: CallbackContext) -> None:
     """Allows users to claim a random character from the database."""
     user_id = update.effective_user.id
-    user = await user_collection.find_one({"id": user_id}) or {}
 
-    # ✅ Initialize missing fields
+    # ✅ Fetch or Register User in Database
+    user = await user_collection.find_one({"id": user_id})
+    if not user:
+        user = {
+            "id": user_id,
+            "username": update.effective_user.username,
+            "first_name": update.effective_user.first_name,
+            "characters": [],
+            "claims": 0,
+            "last_claim": 0,
+            "coins": 0,
+            "chrono_crystals": 0
+        }
+        await user_collection.insert_one(user)
+
+    # ✅ Fetch Claim Data
     claims = user.get("claims", 0)
     last_claim = user.get("last_claim", 0)
-    is_admin = OWNER_ID or user_id in sudo_users  # ✅ Owner & Sudo have unlimited claims
-
     current_time = time.time()
 
-    # ✅ **Normal Users: Check Claim Limits**
-    if not is_admin:
-        if claims >= MAX_CLAIMS:
-            await update.message.reply_text("❌ You have reached your daily claim limit. Try again tomorrow!")
-            return
+    # ✅ **Check Claim Limits**
+    if claims >= MAX_CLAIMS:
+        await update.message.reply_text("❌ You have already claimed today. Try again tomorrow!")
+        return
 
-        cooldown_remaining = COOLDOWN_TIME - (current_time - last_claim)
-        if cooldown_remaining > 0:
-            hours = int(cooldown_remaining // 3600)
-            minutes = int((cooldown_remaining % 3600) // 60)
-            await update.message.reply_text(f"⏳ You must wait {hours}h {minutes}m before claiming again!")
-            return
+    cooldown_remaining = COOLDOWN_TIME - (current_time - last_claim)
+    if cooldown_remaining > 0:
+        hours = int(cooldown_remaining // 3600)
+        minutes = int((cooldown_remaining % 3600) // 60)
+        await update.message.reply_text(f"⏳ You must wait {hours}h {minutes}m before claiming again!")
+        return
 
     # ✅ Fetch a random character from the database
     total_characters = await collection.count_documents({})
@@ -50,11 +61,14 @@ async def claim(update: Update, context: CallbackContext) -> None:
     await asyncio.sleep(7)
 
     # ✅ **Ensure claimed character is saved correctly**
-    update_data = {"$push": {"characters": random_character}}
-    if not is_admin:
-        update_data.update({"$set": {"last_claim": current_time}, "$inc": {"claims": 1}})
-
-    await user_collection.update_one({"id": user_id}, update_data)
+    await user_collection.update_one(
+        {"id": user_id},
+        {
+            "$push": {"characters": random_character},
+            "$set": {"last_claim": current_time},
+            "$inc": {"claims": 1}
+        }
+    )
 
     # ✅ Prepare Character Message
     char_name = random_character["name"]

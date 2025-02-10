@@ -19,8 +19,8 @@ def get_rank(total_characters):
             return rank
     return "🆕 Newbie"
 
-def progress_bar(value, max_value=500, length=10):
-    """Generate a progress bar for currency display."""
+def progress_bar(value, max_value=500, length=5):
+    """Generate a compact progress bar for currency display."""
     filled_blocks = int((value / max_value) * length)
     return "🟩" * filled_blocks + "⬜" * (length - filled_blocks)
 
@@ -41,17 +41,17 @@ async def profile(update: Update, context: CallbackContext) -> None:
     # 🏆 **Enhanced Profile UI**
     profile_message = (
         f"👤 <b>{update.effective_user.first_name}'s Profile</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "━━━━━━━━━━━━━━\n"
         f"🎖 <b>Rank:</b> {rank}\n"
-        f"🎴 <b>Characters Collected:</b> <code>{total_characters}</code>\n"
+        f"🎴 <b>Characters:</b> <code>{total_characters}</code>\n"
+        "━━━━━━━━━━━━━━\n"
         f"💰 <b>Zeni:</b> <code>{user['coins']}</code> {progress_bar(user['coins'])}\n"
         f"💎 <b>Chrono Crystals:</b> <code>{user['chrono_crystals']}</code> {progress_bar(user['chrono_crystals'], max_value=100)}\n"
         f"🎟 <b>Summon Tickets:</b> <code>{user['summon_tickets']}</code>\n"
         f"🛡 <b>Exclusive Tokens:</b> <code>{user['exclusive_tokens']}</code>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━"
     )
 
-    # ✅ Try to fetch Telegram profile picture
+    # ✅ Fetch Telegram profile picture
     user_photo = await context.bot.get_user_profile_photos(user_id)
     if user_photo.photos:
         photo_file_id = user_photo.photos[0][-1].file_id

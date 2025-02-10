@@ -120,6 +120,7 @@ async def market_callback(update: Update, context: CallbackContext) -> None:
     await market(update, context, page)
 
 # ✅ Buy Character (Fixed Currency Deduction)
+
 async def buy_character(update: Update, context: CallbackContext) -> None:
     """Handles buying a character from the market and notifies the seller."""
     user_id = update.effective_user.id
@@ -129,6 +130,7 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         return
 
     listing_id = context.args[0]
+    
     try:
         listing = await market_collection.find_one({"_id": ObjectId(listing_id)})
         if not listing:
@@ -147,14 +149,20 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ **You cannot buy your own listing!**", parse_mode="Markdown")
         return
 
-    # ✅ Fetch buyer data
+    # ✅ Fetch buyer & seller data
     buyer = await user_collection.find_one({"id": user_id})
+    seller = await user_collection.find_one({"id": seller_id})
+
     if not buyer:
         await update.message.reply_text("❌ **You need to guess characters first!**", parse_mode="Markdown")
         return
+    if not seller:
+        await update.message.reply_text("❌ **Seller does not exist!**", parse_mode="Markdown")
+        return
 
     # ✅ **Fix Currency Deduction Issue**
-    buyer_balance = int(buyer.get(currency, 0))
+    buyer_balance = buyer.get(currency, 0)
+
     if buyer_balance < price:
         await update.message.reply_text(
             f"❌ **Not enough {currency.capitalize()}!** You need `{price}`, but you have `{buyer_balance}`.",
@@ -163,15 +171,15 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         return
 
     # ✅ Deduct currency from buyer & add character
-    await user_collection.update_one({"id": user_id}, {
-        "$inc": {currency: -price},
-        "$push": {"characters": char}
-    })
+    await user_collection.update_one(
+        {"id": user_id},
+        {"$inc": {currency: -price}, "$push": {"characters": char}}
+    )
 
     # ✅ Transfer currency to seller
     await user_collection.update_one({"id": seller_id}, {"$inc": {currency: price}})
 
-    # ✅ Remove listing
+    # ✅ Remove listing from market
     await market_collection.delete_one({"_id": ObjectId(listing_id)})
 
     # ✅ **Log the Transaction**
@@ -181,7 +189,7 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         "character": char,
         "price": price,
         "currency": currency,
-        "timestamp": math.floor(time.time())
+        "timestamp": int(time.time())
     })
 
     # ✅ **Notify the Seller**
@@ -209,7 +217,6 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         f"🔹 The character has been added to your collection!",
         parse_mode="Markdown"
     )
-    
 
 
 async def market_help(update: Update, context: CallbackContext) -> None:

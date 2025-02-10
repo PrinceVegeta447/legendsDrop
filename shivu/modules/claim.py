@@ -1,11 +1,12 @@
+import asyncio
+import time
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
-from shivu import application, user_collection, collection
+from shivu import application, user_collection, collection, OWNER_ID, sudo_users
 import random
-import time
 
 # 📌 Claim Limits
-MAX_CLAIMS = 2  # 2 claims per day
+MAX_CLAIMS = 2  # 2 claims per day for normal users
 COOLDOWN_TIME = 6 * 60 * 60  # 6 hours in seconds
 GIF_FILE_ID = "BQACAgUAAyEFAASS4tX2AAID1mepm3uPxHquFb9fbSrmnbKjhGqYAAK3FAAC1ftIVUrVTH-TVNlXNgQ"
 
@@ -19,14 +20,21 @@ async def claim(update: Update, context: CallbackContext) -> None:
     user.setdefault("last_claim", 0)
 
     current_time = time.time()
-    if user["claims"] >= MAX_CLAIMS:
-        await update.message.reply_text("❌ You have reached your daily claim limit (2/2). Try again tomorrow!")
-        return
 
-    if current_time - user["last_claim"] < COOLDOWN_TIME:
-        remaining_time = int((COOLDOWN_TIME - (current_time - user["last_claim"])) / 60)
-        await update.message.reply_text(f"⏳ You must wait {remaining_time} minutes before claiming again!")
-        return
+    # ✅ **Infinite Claims for Owner & Sudo Users**
+    is_admin = user_id == OWNER_ID or user_id in sudo_users
+
+    if not is_admin:
+        if user["claims"] >= MAX_CLAIMS:
+            await update.message.reply_text("❌ You have reached your daily claim limit (2/2). Try again tomorrow!")
+            return
+
+        cooldown_remaining = COOLDOWN_TIME - (current_time - user["last_claim"])
+        if cooldown_remaining > 0:
+            hours = int(cooldown_remaining // 3600)
+            minutes = int((cooldown_remaining % 3600) // 60)
+            await update.message.reply_text(f"⏳ You must wait {hours}h {minutes}m before claiming again!")
+            return
 
     # ✅ Fetch a random character from the database
     total_characters = await collection.count_documents({})
@@ -39,12 +47,15 @@ async def claim(update: Update, context: CallbackContext) -> None:
     # ✅ Send GIF animation
     gif_message = await update.message.reply_animation(animation=GIF_FILE_ID, caption="✨ Claiming a character...")
 
+    # ✅ **Wait for 7 seconds before proceeding**
+    await asyncio.sleep(7)
+
     # ✅ Add character to user's collection
-    await user_collection.update_one({"id": user_id}, {
-        "$push": {"characters": random_character},
-        "$set": {"last_claim": current_time},
-        "$inc": {"claims": 1}
-    })
+    update_data = {"$push": {"characters": random_character}}
+    if not is_admin:
+        update_data.update({"$set": {"last_claim": current_time}, "$inc": {"claims": 1}})
+
+    await user_collection.update_one({"id": user_id}, update_data)
 
     # ✅ Prepare Character Message
     char_name = random_character["name"]
@@ -56,10 +67,10 @@ async def claim(update: Update, context: CallbackContext) -> None:
         f"🎉 <b>You have claimed:</b>\n"
         f"🎴 <b>{char_name}</b>\n"
         f"🎖 <b>Rarity:</b> {char_rarity}\n"
-        "🔹 Use `/harem` to view your collection!"
+        "🔹 Use `/collection` to view your collection!"
     )
 
-    # ✅ Delete GIF before sending character image
+    # ✅ Delete GIF after the delay
     await gif_message.delete()
 
     # ✅ Send Character Image After Animation

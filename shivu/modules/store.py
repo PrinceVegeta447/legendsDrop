@@ -24,6 +24,9 @@ async def generate_store():
         return []  # Not enough characters
 
     store = random.sample(available_characters, 10)  # Select 10 random characters
+    for character in store:
+        character["price"] = RARITY_PRICES.get(character["rarity"], 999999)  # Assign price
+
     await store_collection.delete_many({})
     await store_collection.insert_one({"date": time.strftime("%Y-%m-%d"), "characters": store})
     return store
@@ -48,9 +51,10 @@ async def store(update: Update, context: CallbackContext) -> None:
 
     store_message = "<b>🛒 Today's Character Store</b>\n━━━━━━━━━━━━━━━━━━━━\n"
     for char in characters:
-        rarity = char["rarity"]
-        price = RARITY_PRICES.get(rarity, 999999)
-        store_message += f"{rarity} {char['id']} <b>{char['name']}</b>\n💰 Price: <code>{price} Zeni</code>\n━━━━━━━━━━━━━━━━━━━━\n"
+        store_message += (
+            f"{char['rarity']} {char['id']} <b>{char['name']}</b>\n"
+            f"💰 Price: <code>{char['price']} Zeni</code>\n━━━━━━━━━━━━━━━━━━━━\n"
+        )
 
     keyboard = [[InlineKeyboardButton("🔄 Refresh Store", callback_data="refresh_store")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -83,14 +87,14 @@ async def buy_store_character(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
     if len(context.args) != 1:
-        await update.message.reply_text("❌ **Usage:** `/buy <character_id>`", parse_mode="Markdown")
+        await update.message.reply_text("❌ **Usage:** `/storebuy <character_id>`", parse_mode="Markdown")
         return
 
     char_id = context.args[0]
 
     # ✅ Fetch User Data
     user = await user_collection.find_one({"id": user_id}) or {}
-    user_coins = int(user.get("coins", 0))  # ✅ Fetches from "coins" instead of "zeni"
+    user_coins = int(user.get("coins", 0))  # ✅ Fetches from "coins"
 
     # ✅ Fetch Store Data
     store_data = await store_collection.find_one({})
@@ -104,7 +108,7 @@ async def buy_store_character(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ **Invalid character ID!**", parse_mode="Markdown")
         return
 
-    price = int(character["price"])
+    price = int(character.get("price", 999999))  # Ensure price exists
 
     # ✅ Check Zeni Balance
     if user_coins < price:

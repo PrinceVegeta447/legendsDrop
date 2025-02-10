@@ -4,77 +4,71 @@ from shivu import application, user_collection, collection
 import random
 import time
 
-# ✅ Claim Settings
-CLAIM_LIMIT = 2  # Max claims per day
-CLAIM_COOLDOWN = 6 * 60 * 60  # 6 hours in seconds
-CLAIM_GIF = "BQACAgUAAyEFAASS4tX2AAID1mepm3uPxHquFb9fbSrmnbKjhGqYAAK3FAAC1ftIVUrVTH-TVNlXNgQ"  # Claim animation
+# 📌 Claim Limits
+MAX_CLAIMS = 2  # 2 claims per day
+COOLDOWN_TIME = 6 * 60 * 60  # 6 hours in seconds
+GIF_FILE_ID = "BQACAgUAAyEFAASS4tX2AAID1mepm3uPxHquFb9fbSrmnbKjhGqYAAK3FAAC1ftIVUrVTH-TVNlXNgQ"
 
 async def claim(update: Update, context: CallbackContext) -> None:
-    """Allows users to claim a random character with cooldown & daily limit."""
+    """Allows users to claim a random character from the database."""
     user_id = update.effective_user.id
-    current_time = int(time.time())
+    user = await user_collection.find_one({"id": user_id}) or {}
 
-    user = await user_collection.find_one({'id': user_id}) or {}
-
-    # ✅ Initialize missing fields
+    # ✅ Initialize claim data if missing
+    user.setdefault("claims", 0)
     user.setdefault("last_claim", 0)
-    user.setdefault("claim_count", 0)
-    user.setdefault("claim_date", current_time)
 
-    # ✅ Reset claim count daily
-    last_claim_date = time.gmtime(user["claim_date"]).tm_yday
-    current_day = time.gmtime(current_time).tm_yday
-    if last_claim_date != current_day:
-        user["claim_count"] = 0
-        user["claim_date"] = current_time
-
-    # ✅ Check if user reached daily limit
-    if user["claim_count"] >= CLAIM_LIMIT:
-        await update.message.reply_text("❌ You have reached your daily claim limit! Try again tomorrow.")
+    current_time = time.time()
+    if user["claims"] >= MAX_CLAIMS:
+        await update.message.reply_text("❌ You have reached your daily claim limit (2/2). Try again tomorrow!")
         return
 
-    # ✅ Check cooldown
-    time_since_last_claim = current_time - user["last_claim"]
-    if time_since_last_claim < CLAIM_COOLDOWN:
-        remaining_time = CLAIM_COOLDOWN - time_since_last_claim
-        hours = remaining_time // 3600
-        minutes = (remaining_time % 3600) // 60
-        await update.message.reply_text(f"⏳ You must wait {hours}h {minutes}m before claiming again!")
+    if current_time - user["last_claim"] < COOLDOWN_TIME:
+        remaining_time = int((COOLDOWN_TIME - (current_time - user["last_claim"])) / 60)
+        await update.message.reply_text(f"⏳ You must wait {remaining_time} minutes before claiming again!")
         return
 
-    # ✅ Get a random character from database
+    # ✅ Fetch a random character from the database
     total_characters = await collection.count_documents({})
     if total_characters == 0:
-        await update.message.reply_text("❌ No characters available to claim.")
+        await update.message.reply_text("❌ No characters available to claim!")
         return
 
     random_character = await collection.find_one({}, skip=random.randint(0, total_characters - 1))
-    if not random_character:
-        await update.message.reply_text("❌ Failed to claim a character. Try again!")
-        return
 
-    # ✅ Play Claim Animation (GIF)
-    gif_message = await update.message.reply_animation(animation=CLAIM_GIF, caption="✨ Claiming Character...")
+    # ✅ Send GIF animation
+    gif_message = await update.message.reply_animation(animation=GIF_FILE_ID, caption="✨ Claiming a character...")
 
-    # ✅ Wait 2 seconds before revealing character
-    await gif_message.edit_caption("🔍 Searching for a character...")
-    await context.bot.sleep(2)
+    # ✅ Add character to user's collection
+    await user_collection.update_one({"id": user_id}, {
+        "$push": {"characters": random_character},
+        "$set": {"last_claim": current_time},
+        "$inc": {"claims": 1}
+    })
 
-    # ✅ Update User Data (Add character & update claim info)
-    await user_collection.update_one(
-        {"id": user_id},
-        {"$push": {"characters": random_character}, "$set": {"last_claim": current_time, "claim_count": user["claim_count"] + 1, "claim_date": current_time}},
-        upsert=True
+    # ✅ Prepare Character Message
+    char_name = random_character["name"]
+    char_rarity = random_character.get("rarity", "Unknown")
+    char_file_id = random_character.get("file_id")
+    char_img_url = random_character.get("img_url")
+
+    character_message = (
+        f"🎉 <b>You have claimed:</b>\n"
+        f"🎴 <b>{char_name}</b>\n"
+        f"🎖 <b>Rarity:</b> {char_rarity}\n"
+        "🔹 Use `/harem` to view your collection!"
     )
 
-    # ✅ Show Claimed Character
-    await gif_message.edit_caption(
-        f"🎉 **You Claimed:** {random_character['name']}!\n"
-        f"🔖 **Rarity:** {random_character.get('rarity', 'Unknown')}\n"
-        f"🎴 **Category:** {random_character.get('category', 'General')}\n\n"
-        f"🔹 Use `/collection` to view your collection!",
-        parse_mode="Markdown"
-    )
+    # ✅ Delete GIF before sending character image
+    await gif_message.delete()
+
+    # ✅ Send Character Image After Animation
+    if char_file_id:
+        await update.message.reply_photo(photo=char_file_id, caption=character_message, parse_mode="HTML")
+    elif char_img_url:
+        await update.message.reply_photo(photo=char_img_url, caption=character_message, parse_mode="HTML")
+    else:
+        await update.message.reply_text(character_message, parse_mode="HTML")
 
 # ✅ Register Handler
 application.add_handler(CommandHandler("claim", claim, block=False))

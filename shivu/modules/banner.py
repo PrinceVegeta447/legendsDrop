@@ -1,107 +1,154 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext
 from shivu import application, banners_collection, OWNER_ID, sudo_users
 from bson import ObjectId
 
-
-# ✅ Create a new banner with enhanced UI
+# ✅ **Create a New Banner**
 async def create_banner(update: Update, context: CallbackContext) -> None:
-    """Allows bot owners to create a new summon banner."""
+    """Allows bot owners to create a new summon banner with an image."""
     if update.effective_user.id not in sudo_users and update.effective_user.id != OWNER_ID:
-        await update.message.reply_text("🚫 **You don't have permission to create banners!**", parse_mode="Markdown")
+        await update.message.reply_text("🚫 <b>You don't have permission to create banners!</b>", parse_mode="HTML")
         return
 
     try:
         args = context.args
         if len(args) != 2:
-            await update.message.reply_text("❌ **Usage:**\n`/createbanner <name> <file_id>`", parse_mode="Markdown")
+            await update.message.reply_text(
+                "❌ <b>Usage:</b>\n"
+                "<code>/createbanner &lt;name&gt; &lt;file_id&gt;</code>",
+                parse_mode="HTML"
+            )
             return
 
         name, file_id = args
-
-        banner = {
-            "name": name,
-            "file_id": file_id,
-            "characters": []  # Stores exclusive characters added to this banner
-        }
+        banner = {"name": name, "file_id": file_id, "characters": []}
 
         banner_doc = await banners_collection.insert_one(banner)
-        banner_id = str(banner_doc.inserted_id)  # Convert ObjectId to string
+        banner_id = str(banner_doc.inserted_id)
+
+        # ✅ **Success Message with Inline Button**
+        keyboard = [[InlineKeyboardButton("📜 View Banners", callback_data="view_banners")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
         await update.message.reply_text(
-            f"✅ **New Summon Banner Created!**\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"🎟 **Banner Name:** `{name}`\n"
-            f"🆔 **Banner ID:** `{banner_id}`\n\n"
-            f"🔹 **Next Steps:**\n"
-            f"➜ Use `/badd` to add characters.\n"
-            f"➜ Use `/banners` to view banners.\n\n"
-            f"✨ **Good Luck Summoning!** 🎉",
-            parse_mode="Markdown"
+            f"✅ <b>New Summon Banner Created!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎟 <b>Banner Name:</b> <code>{name}</code>\n"
+            f"🆔 <b>Banner ID:</b> <code>{banner_id}</code>\n\n"
+            f"🔹 <b>Next Steps:</b>\n"
+            f"➜ Use <code>/badd</code> to add characters.\n"
+            f"➜ Use <code>/banners</code> to view all banners.\n\n"
+            f"✨ <b>Good Luck Summoning!</b> 🎉",
+            parse_mode="HTML",
+            reply_markup=reply_markup
         )
     except Exception as e:
-        await update.message.reply_text(f"❌ **Error Creating Banner:** `{str(e)}`", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ <b>Error Creating Banner:</b> <code>{str(e)}</code>", parse_mode="HTML")
 
 
-# ✅ List active banners with enhanced UI
+# ✅ **List All Active Banners**
 async def view_banners(update: Update, context: CallbackContext) -> None:
-    """Displays all available summon banners with a professional look."""
+    """Displays all available summon banners with images."""
     banners = await banners_collection.find({}).to_list(length=None)
 
     if not banners:
-        await update.message.reply_text("❌ **No active banners at the moment!**", parse_mode="Markdown")
+        await update.message.reply_text("❌ <b>No active banners at the moment!</b>", parse_mode="HTML")
         return
 
     for banner in banners:
+        keyboard = [[InlineKeyboardButton("🔄 Refresh List", callback_data="view_banners")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
         await update.message.reply_photo(
             photo=banner["file_id"],
             caption=(
-                f"🎟 **Summon Banner: {banner['name']}**\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"🆔 **Banner ID:** `{banner['_id']}`\n"
-                f"📅 **Status:** 🟢 Active\n\n"
-                f"🔹 **How to Summon?**\n"
-                f"➜ Use `/bsummon {banner['_id']}` to summon characters.\n\n"
-                f"✨ **Good Luck Summoning!** 🎉"
+                f"🎟 <b>Summon Banner:</b> <code>{banner['name']}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🆔 <b>Banner ID:</b> <code>{banner['_id']}</code>\n"
+                f"📅 <b>Status:</b> 🟢 <i>Active</i>\n\n"
+                f"🔹 <b>How to Summon?</b>\n"
+                f"➜ Use <code>/bsummon {banner['_id']}</code> to summon characters.\n\n"
+                f"✨ <b>Good Luck Summoning!</b> 🎉"
             ),
-            parse_mode="Markdown"
+            parse_mode="HTML",
+            reply_markup=reply_markup
         )
 
 
-# ✅ Delete a banner with improved UI
+# ✅ **Delete a Banner**
 async def delete_banner(update: Update, context: CallbackContext) -> None:
-    """Deletes a summon banner."""
+    """Deletes a summon banner safely with confirmation."""
     if update.effective_user.id not in sudo_users and update.effective_user.id != OWNER_ID:
-        await update.message.reply_text("🚫 **You don't have permission to delete banners!**", parse_mode="Markdown")
+        await update.message.reply_text("🚫 <b>You don't have permission to delete banners!</b>", parse_mode="HTML")
         return
 
     try:
         args = context.args
         if len(args) != 1:
-            await update.message.reply_text("❌ **Usage:**\n`/deletebanner <banner_id>`", parse_mode="Markdown")
+            await update.message.reply_text(
+                "❌ <b>Usage:</b>\n"
+                "<code>/deletebanner &lt;banner_id&gt;</code>",
+                parse_mode="HTML"
+            )
             return
 
         banner_id = args[0]
-
         banner = await banners_collection.find_one({"_id": ObjectId(banner_id)})
         if not banner:
-            await update.message.reply_text("❌ **Invalid Banner ID!**", parse_mode="Markdown")
+            await update.message.reply_text("❌ <b>Invalid Banner ID!</b>", parse_mode="HTML")
             return
 
-        await banners_collection.delete_one({"_id": ObjectId(banner_id)})
+        # ✅ **Confirmation Message**
+        keyboard = [
+            [InlineKeyboardButton("🗑 Confirm Delete", callback_data=f"confirm_delete:{banner_id}")],
+            [InlineKeyboardButton("❌ Cancel", callback_data="cancel_delete")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
         await update.message.reply_text(
-            f"✅ **Banner Deleted Successfully!**\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"🎟 **Banner Name:** `{banner['name']}`\n"
-            f"🆔 **Banner ID:** `{banner_id}`\n\n"
-            f"🔹 **Use `/createbanner` to add a new banner!**",
-            parse_mode="Markdown"
+            f"⚠️ <b>Confirm Deletion</b>\n\n"
+            f"🎟 <b>Banner Name:</b> <code>{banner['name']}</code>\n"
+            f"🆔 <b>Banner ID:</b> <code>{banner_id}</code>\n\n"
+            f"❌ <b>This action is irreversible.</b>\n\n"
+            f"🔹 Click <b>Confirm Delete</b> to proceed.",
+            parse_mode="HTML",
+            reply_markup=reply_markup
         )
+
     except Exception as e:
-        await update.message.reply_text(f"❌ **Error Deleting Banner:** `{str(e)}`", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ <b>Error Deleting Banner:</b> <code>{str(e)}</code>", parse_mode="HTML")
 
 
-# ✅ Add Command Handlers
+# ✅ **Handle Banner Deletion Confirmation**
+async def confirm_delete(update: Update, context: CallbackContext) -> None:
+    """Executes banner deletion when user confirms."""
+    query = update.callback_query
+    _, banner_id = query.data.split(":")  # Extract banner ID
+
+    banner = await banners_collection.find_one({"_id": ObjectId(banner_id)})
+    if not banner:
+        await query.message.edit_text("❌ <b>Banner not found!</b>", parse_mode="HTML")
+        return
+
+    await banners_collection.delete_one({"_id": ObjectId(banner_id)})
+    await query.message.edit_text(
+        f"✅ <b>Banner Deleted Successfully!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🎟 <b>Banner Name:</b> <code>{banner['name']}</code>\n"
+        f"🆔 <b>Banner ID:</b> <code>{banner_id}</code>\n\n"
+        f"🔹 <b>Use</b> <code>/createbanner</code> <b>to add a new banner!</b>",
+        parse_mode="HTML"
+    )
+
+async def cancel_delete(update: Update, context: CallbackContext) -> None:
+    """Handles cancel action for banner deletion."""
+    query = update.callback_query
+    await query.message.edit_text("❌ <b>Deletion Cancelled.</b>", parse_mode="HTML")
+
+
+# ✅ **Add Command Handlers**
 application.add_handler(CommandHandler("createbanner", create_banner, block=False))
 application.add_handler(CommandHandler("banners", view_banners, block=False))
 application.add_handler(CommandHandler("deletebanner", delete_banner, block=False))
+application.add_handler(CallbackQueryHandler(confirm_delete, pattern="^confirm_delete:", block=False))
+application.add_handler(CallbackQueryHandler(cancel_delete, pattern="^cancel_delete$", block=False))

@@ -28,14 +28,12 @@ async def generate_store():
 
     for char in selected_characters:
         price = RARITY_PRICES.get(char["rarity"], 999999)  # Assign price
-        char["price"] = price  # ✅ Ensure price is stored in the database
-        store.append(char)
+        store.append({"id": char["id"], "name": char["name"], "rarity": char["rarity"], "price": price})
 
     # ✅ Save Store to Database
     await store_collection.delete_many({})
     await store_collection.insert_one({"date": time.strftime("%Y-%m-%d"), "characters": store})
     return store
-
 
 async def get_store():
     """Fetches the current store, generates a new one if expired."""
@@ -56,15 +54,20 @@ async def store(update: Update, context: CallbackContext) -> None:
         return
 
     store_message = "<b>🛒 Today's Character Store</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+    keyboard = []
+
     for char in characters:
         store_message += (
-            f"{char['rarity']} {char['id']} <b>{char['name']}</b>\n"
-            f"💰 Price: <code>{char['price']} Zeni</code>\n━━━━━━━━━━━━━━━━━━━━\n"
+            f"{char['rarity']} <b>{char['name']}</b>\n"
+            f"💰 <b>Price:</b> <code>{char['price']} Zeni</code>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
         )
+        keyboard.append([InlineKeyboardButton(f"🛍 Buy {char['name']}", callback_data=f"storebuy_{char['id']}")])
 
-    keyboard = [[InlineKeyboardButton("🔄 Refresh Store", callback_data="refresh_store")]]
+    # ✅ Add Refresh Button
+    keyboard.append([InlineKeyboardButton("🔄 Refresh Store", callback_data="refresh_store")])
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
-
     await update.message.reply_text(store_message, parse_mode="HTML", reply_markup=reply_markup)
 
 async def refresh_store(update: Update, context: CallbackContext) -> None:
@@ -90,13 +93,9 @@ async def refresh_store(update: Update, context: CallbackContext) -> None:
 
 async def buy_store_character(update: Update, context: CallbackContext) -> None:
     """Handles buying a character from the store."""
+    query = update.callback_query
     user_id = update.effective_user.id
-
-    if len(context.args) != 1:
-        await update.message.reply_text("❌ **Usage:** `/storebuy <character_id>`", parse_mode="Markdown")
-        return
-
-    char_id = context.args[0]
+    char_id = query.data.split("_")[1]
 
     # ✅ Fetch User Data
     user = await user_collection.find_one({"id": user_id}) or {}
@@ -105,23 +104,20 @@ async def buy_store_character(update: Update, context: CallbackContext) -> None:
     # ✅ Fetch Store Data
     store_data = await store_collection.find_one({})
     if not store_data:
-        await update.message.reply_text("❌ **Store is currently empty!**", parse_mode="Markdown")
+        await query.answer("❌ Store is empty!", show_alert=True)
         return
 
     # ✅ Find the Character in Store
     character = next((c for c in store_data["characters"] if c["id"] == char_id), None)
     if not character:
-        await update.message.reply_text("❌ **Invalid character ID!**", parse_mode="Markdown")
+        await query.answer("❌ Character not found in store!", show_alert=True)
         return
 
     price = int(character.get("price", 999999))  # Ensure price exists
 
     # ✅ Check Zeni Balance
     if user_coins < price:
-        await update.message.reply_text(
-            f"❌ **Not enough Zeni!** You need `{price}`, but you have `{user_coins}`.",
-            parse_mode="Markdown"
-        )
+        await query.answer(f"❌ Not enough Zeni! You need {price}, but have {user_coins}.", show_alert=True)
         return
 
     # ✅ Deduct Zeni & Add Character to Inventory
@@ -131,17 +127,17 @@ async def buy_store_character(update: Update, context: CallbackContext) -> None:
     )
 
     # ✅ Confirm Purchase
-    await update.message.reply_text(
-        f"✅ **Purchase Successful!**\n"
-        f"🎴 **Character:** {character['name']}\n"
-        f"🎖 **Rarity:** {character['rarity']}\n"
-        f"💰 **Price:** {price} Zeni\n"
+    await query.answer(f"✅ Purchased {character['name']} for {price} Zeni!", show_alert=True)
+    await update.callback_query.message.reply_text(
+        f"✅ <b>Purchase Successful!</b>\n"
+        f"🎴 <b>Character:</b> {character['name']}\n"
+        f"🎖 <b>Rarity:</b> {character['rarity']}\n"
+        f"💰 <b>Price:</b> {price} Zeni\n"
         f"🔹 The character has been added to your collection!",
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
 
-
 # ✅ **Register Handler**
-application.add_handler(CommandHandler("storebuy", buy_store_character, block=False))
 application.add_handler(CommandHandler("store", store, block=False))
 application.add_handler(CallbackQueryHandler(refresh_store, pattern="^refresh_store$", block=False))
+application.add_handler(CallbackQueryHandler(buy_store_character, pattern="^storebuy_", block=False))

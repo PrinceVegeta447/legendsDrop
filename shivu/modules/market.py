@@ -111,6 +111,15 @@ async def market(update: Update, context: CallbackContext, page=0) -> None:
     else:
         await update.callback_query.edit_message_text(message, parse_mode="Markdown", reply_markup=reply_markup)
 
+# ✅ Market Pagination Callback
+async def market_callback(update: Update, context: CallbackContext) -> None:
+    """Handles market pagination."""
+    query = update.callback_query
+    _, page = query.data.split(":")
+    page = int(page)
+
+    await market(update, context, page)
+
 # ✅ Buy Character (Fixed Currency Deduction)
 async def buy_character(update: Update, context: CallbackContext) -> None:
     """Handles buying a character from the market."""

@@ -117,7 +117,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
             "15": "👾 Cell Saga",
             "16": "📽️ Sagas From the Movies",
             "17": "☠️ Lineage Of Evil",
-            "18": "🌏 Universe Survival Saga
+            "18": "🌏 Universe Survival Saga"
         }
         category = category_map.get(category_input)
         if not category:

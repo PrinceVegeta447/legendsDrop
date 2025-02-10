@@ -77,13 +77,15 @@ async def store(update: Update, context: CallbackContext) -> None:
         return
 
     store_message = "<b>🛒 Today's Character Store</b>\n━━━━━━━━━━━━━━━━━━━━\n"
-    for char in characters:
-        category = char.get("category", "Unknown")  # Avoid KeyError
-        store_message += (
-            f"{char['rarity']} {char['id']} <b>{char['name']}</b>\n"
-            f"🏷 <b>Category:</b> {category}\n"
-            f"💰 <b>Price:</b> <code>{char['price']} Zeni</code>\n━━━━━━━━━━━━━━━━━━━━\n"
-        )
+for char in characters:
+    category = char.get("category", "Unknown")
+    store_message += (
+        f"{char['rarity']} <b>{char['name']}</b>\n"
+        f"🏷 <b>Category:</b> {category}\n"
+        f"💰 <b>Price:</b> {char['price']} Zeni\n"
+        f"🆔 Character ID: <code>{char['id']}</code>\n"  # ✅ Fix here
+        "━━━━━━━━━━━━━━━━━━━━\n"
+    )
 
     store_message += "🔹 Use `/refreshstore` to refresh the store.\n"
     store_message += "💰 Use `/storebuy <character_id>` to purchase a character."

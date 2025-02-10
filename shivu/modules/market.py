@@ -211,11 +211,34 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         parse_mode="Markdown"
     )
 
+async def market_help(update: Update, context: CallbackContext) -> None:
+    """Provides help and instructions for the market system."""
+    help_message = (
+        "🛒 <b>Market Help</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "📌 The Market allows you to sell and buy characters using Zeni or Chrono Crystals.\n\n"
+        "💰 <b>Selling:</b>\n"
+        "➜ `/msell <char_id> <price>` - Sell a character for Zeni.\n"
+        "➜ `/msellcc <char_id> <price>` - Sell for Chrono Crystals.\n\n"
+        "🔎 <b>Browsing:</b>\n"
+        "➜ `/market` - View all available listings.\n"
+        "➜ `/mylistings` - View your own listings.\n\n"
+        "🛒 <b>Buying:</b>\n"
+        "➜ Click on 'Buy' to purchase a character.\n\n"
+        "🚫 <b>Removing a Listing:</b>\n"
+        "➜ `/mremove <listing_id>` - Remove your character from the market.\n\n"
+        "Use `/market` to start browsing!"
+    )
+
+    await update.message.reply_text(help_message, parse_mode="HTML")
+
+# ✅ Register Command Handler
+application.add_handler(CommandHandler("mhelp", market_help, block=False))
 
 # ✅ **Add Handlers**
 application.add_handler(CommandHandler("market", market, block=False))
 application.add_handler(CallbackQueryHandler(market_callback, pattern="^market:", block=False))
 application.add_handler(CallbackQueryHandler(buy_character, pattern="^buy:", block=False))
-application.add_handler(CommandHandler("sell", sell, block=False))
+application.add_handler(CommandHandler("msell", sell, block=False))
 application.add_handler(CommandHandler("listings", listings, block=False))
-application.add_handler(CommandHandler("cancel", cancel, block=False))
+application.add_handler(CommandHandler("cancel", "mremove", cancel, block=False))

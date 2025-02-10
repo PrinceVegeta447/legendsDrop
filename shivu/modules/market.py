@@ -6,7 +6,7 @@ import math
 
 # ✅ Sell a Character (Fixed Listing Removal)
 async def sell(update: Update, context: CallbackContext) -> None:
-    """Allows users to sell a duplicate character."""
+    """Allows users to sell a duplicate character (removes only one copy)."""
     user_id = update.effective_user.id
 
     if len(context.args) != 3:
@@ -39,14 +39,14 @@ async def sell(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ **You can only sell duplicates!**", parse_mode="Markdown")
         return
 
-    # ✅ Fetch character details
-    character = next((c for c in user["characters"] if c["id"] == char_id), None)
-    if not character:
-        await update.message.reply_text("❌ **Invalid character ID!**", parse_mode="Markdown")
-        return
+    # ✅ Remove only **one** copy of the character
+    remaining_characters = user["characters"]
+    for character in remaining_characters:
+        if character["id"] == char_id:
+            remaining_characters.remove(character)
+            break  # Stop after removing one copy
 
-    # ✅ Remove character from user's collection
-    await user_collection.update_one({"id": user_id}, {"$pull": {"characters": {"id": char_id}}})
+    await user_collection.update_one({"id": user_id}, {"$set": {"characters": remaining_characters}})
 
     # ✅ Create a market listing
     listing = {
@@ -66,7 +66,6 @@ async def sell(update: Update, context: CallbackContext) -> None:
         f"🔹 Use `/mremove <listing_id>` to cancel a listing.",
         parse_mode="Markdown"
     )
-
 # ✅ View Market Listings (Paginated)
 async def market(update: Update, context: CallbackContext, page=0) -> None:
     """Displays all available characters for sale (Paginated)."""
@@ -148,27 +147,31 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ **You cannot buy your own listing!**", parse_mode="Markdown")
         return
 
-    # Fetch buyer data
+    # ✅ Fetch buyer data
     buyer = await user_collection.find_one({"id": user_id})
     if not buyer:
         await update.message.reply_text("❌ **You need to guess characters first!**", parse_mode="Markdown")
         return
 
+    # ✅ **Fix Currency Deduction Issue**
     buyer_balance = buyer.get(currency, 0)
-    if buyer_balance < price:
-        await update.message.reply_text(f"❌ **Not enough {currency.capitalize()}!**", parse_mode="Markdown")
+    if int(buyer_balance) < int(price):
+        await update.message.reply_text(
+            f"❌ **Not enough {currency.capitalize()}!** You need `{price}`, but you have `{buyer_balance}`.",
+            parse_mode="Markdown"
+        )
         return
 
-    # Deduct currency from buyer & add character
+    # ✅ Deduct currency from buyer & add character
     await user_collection.update_one({"id": user_id}, {
-        "$inc": {currency: -price},
+        "$inc": {currency: -int(price)},
         "$push": {"characters": char}
     })
 
-    # Transfer currency to seller
-    await user_collection.update_one({"id": seller_id}, {"$inc": {currency: price}})
+    # ✅ Transfer currency to seller
+    await user_collection.update_one({"id": seller_id}, {"$inc": {currency: int(price)}})
 
-    # Remove listing
+    # ✅ Remove listing
     await market_collection.delete_one({"_id": ObjectId(listing_id)})
 
     # ✅ **Notify the Seller**
@@ -194,6 +197,8 @@ async def buy_character(update: Update, context: CallbackContext) -> None:
         f"🔹 The character has been added to your collection!",
         parse_mode="Markdown"
         )
+    
+    
 
 
 async def market_help(update: Update, context: CallbackContext) -> None:

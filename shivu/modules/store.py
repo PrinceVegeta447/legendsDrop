@@ -23,13 +23,19 @@ async def generate_store():
     if len(available_characters) < 10:
         return []  # Not enough characters
 
-    store = random.sample(available_characters, 10)  # Select 10 random characters
-    for character in store:
-        character["price"] = RARITY_PRICES.get(character["rarity"], 999999)  # Assign price
+    store = []
+    selected_characters = random.sample(available_characters, 10)  # Select 10 random characters
 
+    for char in selected_characters:
+        price = RARITY_PRICES.get(char["rarity"], 999999)  # Assign price
+        char["price"] = price  # ✅ Ensure price is stored in the database
+        store.append(char)
+
+    # ✅ Save Store to Database
     await store_collection.delete_many({})
     await store_collection.insert_one({"date": time.strftime("%Y-%m-%d"), "characters": store})
     return store
+
 
 async def get_store():
     """Fetches the current store, generates a new one if expired."""

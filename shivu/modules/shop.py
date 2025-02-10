@@ -47,7 +47,7 @@ async def shop(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(shop_message, parse_mode="HTML", reply_markup=reply_markup)
 
 async def request_amount(update: Update, context: CallbackContext) -> None:
-    """Prompts user to enter the quantity before confirming purchase."""
+    """Prompt the user to enter an amount after clicking a button."""
     query = update.callback_query
     user_id = query.from_user.id
 
@@ -55,10 +55,13 @@ async def request_amount(update: Update, context: CallbackContext) -> None:
         await query.message.delete()
         return
 
-    pending_purchases[user_id] = query.data  # Save purchase type (buy_cc or buy_ticket)
-    await query.message.edit_text(
-        "🛍 <b>How many units would you like to buy?</b>\n\n"
-        "💬 <i>Type the quantity in chat (e.g., 10 for 10 units).</i>",
+    item = query.data.split("_")[1]  # Extract "cc" or "ticket"
+    
+    pending_purchases[user_id] = item  # Store purchase type (cc or ticket)
+
+    await query.message.reply_text(
+        "🛍 <b>Enter the amount you want to buy:</b>\n\n"
+        "✏️ Type a number in chat (e.g., 10 for 10 units).",
         parse_mode="HTML"
     )
 
@@ -116,32 +119,43 @@ async def confirm_purchase(update: Update, context: CallbackContext) -> None:
     )
 
 async def finalize_purchase(update: Update, context: CallbackContext) -> None:
-    """Finalizes purchase when user confirms."""
+    """Process the purchase after user confirms."""
     query = update.callback_query
     user_id = query.from_user.id
-    user = await user_collection.find_one({'id': user_id})
 
-    _, purchase_type, amount = query.data.split(":")
-    amount = int(amount)
-
-    if purchase_type == "buy_cc":
-        total_cost = amount * CC_PRICE
-        item_name = "Chrono Crystals"
-        field = "chrono_crystals"
-    elif purchase_type == "buy_ticket":
-        total_cost = amount * TICKET_PRICE
-        item_name = "Summon Tickets"
-        field = "summon_tickets"
-
-    if user.get('coins', 0) < total_cost:
-        await query.message.edit_text(
-            f"❌ <b>Not enough Zeni!</b> You need <code>{total_cost}</code> Zeni for <code>{amount}</code> {item_name}.",
-            parse_mode="HTML"
-        )
+    # ✅ Ensure callback data has the correct format
+    data_parts = query.data.split(":")
+    if len(data_parts) < 3:
+        await query.answer("❌ Error: Invalid purchase data!", show_alert=True)
         return
 
-    # ✅ **Complete the purchase**
+    _, purchase_type, amount = data_parts  # Extract data safely
+
+    try:
+        amount = int(amount)
+    except ValueError:
+        await query.answer("❌ Invalid amount!", show_alert=True)
+        return
+
+    # ✅ Fetch user data
+    user = await user_collection.find_one({'id': user_id})
+    if not user:
+        await query.answer("❌ You have no account! Start by guessing characters.", show_alert=True)
+        return
+
+    coins = user.get('coins', 0)
+    price = CC_PRICE if purchase_type == "cc" else TICKET_PRICE
+    total_cost = amount * price
+
+    if coins < total_cost:
+        await query.answer(f"❌ Not enough Zeni! Need {total_cost} Zeni.", show_alert=True)
+        return
+
+    # ✅ Deduct Zeni & Add Purchased Items
+    field = "chrono_crystals" if purchase_type == "cc" else "summon_tickets"
     await user_collection.update_one({'id': user_id}, {'$inc': {'coins': -total_cost, field: amount}})
+
+    
 
     await query.message.edit_text(
         f"✅ <b>Purchase Successful!</b>\n\n"

@@ -16,25 +16,35 @@ async def maketeam(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ You need at least 3 characters in your collection to make a team!")
         return
 
-    character_list = "\n".join([f"{char['id']} - {char['name']} ({char['rarity']})" for char in user["characters"]])
-    await update.message.reply_text(
-        f"🔹 **Your Collection:**\n{character_list}\n\n"
-        "🛡 Choose 3 characters for battle using:\n"
-        "`/maketeam <id1> <id2> <id3>`",
-        parse_mode="Markdown"
-    )
-
     if len(context.args) != 3:
+        await update.message.reply_text(
+            "❌ Incorrect format!\n"
+            "📌 Use: `/maketeam <id1> <id2> <id3>`",
+            parse_mode="Markdown"
+        )
         return
 
-    team = [char for char in user["characters"] if char["id"] in context.args]
-    if len(team) != 3:
+    selected_ids = set(context.args)  # Convert to set for faster lookup
+    available_ids = {char["id"] for char in user["characters"]}  # Set of user's character IDs
+
+    if not selected_ids.issubset(available_ids):
         await update.message.reply_text("❌ Invalid selection! Make sure all 3 IDs are from your collection.")
         return
 
-    await user_collection.update_one({"id": user_id}, {"$set": {"battle_team": team}})
-    await update.message.reply_text("✅ Team selected successfully! Use `/challenge @username` to start a battle.")
+    team = [char for char in user["characters"] if char["id"] in selected_ids]
 
+    # ✅ Save team to the database
+    await user_collection.update_one({"id": user_id}, {"$set": {"battle_team": team}})
+
+    team_preview = "\n".join([f"🎴 {char['name']} ({char['rarity']})" for char in team])
+    await update.message.reply_text(
+        f"✅ **Team Selected Successfully!**\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"{team_preview}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚔ Use `/challenge @username` to start a battle!",
+        parse_mode="Markdown"
+    )
 # ✅ **Challenge a Player**
 async def challenge(update: Update, context: CallbackContext) -> None:
     """Allows users to challenge others to a PvP battle."""

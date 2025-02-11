@@ -3,6 +3,7 @@ import time
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 from shivu import application, user_collection, collection, store_collection
+import html
 
 # ⚡ **Store Settings**
 EXCLUDED_RARITIES = ["💠 Legends Limited", "🔮 Zenkai", "🏆 Event-Exclusive"]
@@ -40,7 +41,9 @@ CATEGORY_MAPPING = {
 
 async def generate_store():
     """Generates a new daily store with 10 random characters, fetching details from `collection`."""
-    available_characters = await collection.find({"rarity": {"$nin": EXCLUDED_RARITIES}}).to_list(None)
+    available_characters = await collection.find(
+    {"rarity": {"$nin": EXCLUDED_RARITIES}}, {"id": 1, "name": 1, "rarity": 1, "category": 1}
+).to_list(None)
     if len(available_characters) < 10:
         return []
 
@@ -71,6 +74,9 @@ async def get_store():
         return await generate_store()
     return store_data["characters"]
 
+
+# ✅ To safely format characters
+
 async def store(update: Update, context: CallbackContext) -> None:
     """Displays the current character store with pricing."""
     user_id = update.effective_user.id
@@ -82,21 +88,24 @@ async def store(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ No characters available in the store right now!")
         return
 
-    store_message = "<b>🛒 Today's Character Store</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+    store_message = "🛒 <b>Today's Character Store</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+
     for char in characters:
+        category = char.get("category", "Unknown")
+        price = f"{char['price']:,}"  # ✅ Format price with commas (30,000 instead of 30000)
+        
         store_message += (
-            f"{char['rarity']} <b>{char['name']}</b>\n"
-            f"🏷 <b>Category:</b> {char['category']}\n"
-            f"💰 <b>Price:</b> {char['price']} Zeni\n"
-            f"🆔 Character ID: <code>{char['id']}</code>\n"
+            f"{char['rarity']}  {html.escape(char['name'])}\n"
+            f"🏷 Category: {html.escape(category)}\n"
+            f"💰 Price: {price} Zeni\n"
+            f"🆔 Character ID: {char['id']}\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
         )
 
-    store_message += "🔹 Use `/refreshstore` to refresh the store.\n"
-    store_message += "💰 Use `/storebuy <character_id>` to purchase a character."
+    store_message += "🔹 Use /refreshstore to refresh the store.\n"
+    store_message += "💰 Use /storebuy <character_id> to purchase a character."
 
-    await update.message.reply_text(store_message, parse_mode="Markdown")
-
+    await update.message.reply_text(store_message, parse_mode="HTML")
 async def refresh_store(update: Update, context: CallbackContext) -> None:
     """Allows users to refresh the store, with one free refresh per day."""
     user_id = update.effective_user.id

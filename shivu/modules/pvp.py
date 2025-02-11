@@ -1,183 +1,134 @@
-import random
-import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
-from shivu import application, user_collection, collection, battle_collection, OWNER_ID
+import random, time
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CommandHandler, CallbackQueryHandler
+from shivu import user_collection, battle_collection
 
-BATTLE_TIMEOUT = 120  # 2 minutes per turn
+MAX_HP = 100  # Each character starts with 100 HP
 
-# ✅ **Team Selection**
-async def maketeam(update: Update, context: CallbackContext) -> None:
-    """Allows users to select a unique 3-character team before battle."""
+async def make_team(update, context):
+    """Allows users to select 3 characters from their collection"""
     user_id = update.effective_user.id
     user = await user_collection.find_one({"id": user_id})
-
+    
     if not user or "characters" not in user or len(user["characters"]) < 3:
-        await update.message.reply_text("❌ You need at least 3 characters in your collection to make a team!")
+        await update.message.reply_text("❌ You need at least **3 characters** in your collection to form a team!")
         return
 
-    if len(context.args) != 3:
-        await update.message.reply_text(
-            "❌ Incorrect format!\n"
-            "📌 Use: `/maketeam <id1> <id2> <id3>`",
-            parse_mode="Markdown"
-        )
-        return
+    keyboard = []
+    for char in user["characters"]:
+        keyboard.append([InlineKeyboardButton(char["name"], callback_data=f"select_team:{char['name']}")])
 
-    selected_ids = list(set(context.args))  # Remove duplicates while keeping order
+    await update.message.reply_text("🔹 **Select your team (Choose 3 characters):**", 
+                                    reply_markup=InlineKeyboardMarkup(keyboard))
 
-    if len(selected_ids) != 3:
-        await update.message.reply_text("❌ You must select **exactly 3 unique characters**!")
-        return
+async def select_team(update, context):
+    """Handles user selection for team formation"""
+    query = update.callback_query
+    user_id = query.from_user.id
+    char_name = query.data.split(":")[1]
 
-    # ✅ Ensure selected characters exist in user's collection (without duplicates)
-    available_characters = {char["id"]: char for char in user["characters"]}
-    team = [available_characters[cid] for cid in selected_ids if cid in available_characters]
-
-    if len(team) != 3:
-        await update.message.reply_text("❌ Invalid selection! Make sure all 3 IDs are from your collection.")
-        return
-
-    # ✅ Save the unique team to the database
-    await user_collection.update_one({"id": user_id}, {"$set": {"battle_team": team}})
-
-    team_preview = "\n".join([f"🎴 {char['name']} ({char['rarity']})" for char in team])
-    await update.message.reply_text(
-        f"✅ **Team Saved Successfully!**\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"{team_preview}\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚔ Use `/challenge @username` to start a battle!",
-        parse_mode="Markdown"
-    )
-# ✅ **Challenge a Player**
-async def challenge(update: Update, context: CallbackContext) -> None:
-    """Allows users to challenge others to a PvP battle."""
-    user_id = update.effective_user.id
     user = await user_collection.find_one({"id": user_id})
+    if not user:
+        return
+
+    existing_team = await battle_collection.find_one({"user_id": user_id})
+    if not existing_team:
+        await battle_collection.insert_one({"user_id": user_id, "team": [char_name]})
+    else:
+        if len(existing_team["team"]) >= 3:
+            await query.answer("❌ You can only select **3 characters** in your team!", show_alert=True)
+            return
+
+        await battle_collection.update_one({"user_id": user_id}, {"$push": {"team": char_name}})
+
+    updated_team = await battle_collection.find_one({"user_id": user_id})
+    await query.answer(f"✅ {char_name} added to your team!")
+
+    if len(updated_team["team"]) == 3:
+        await query.edit_message_text(f"✅ **Your team is ready!**\n\n**Team Members:**\n" + 
+                                      "\n".join(f"➤ {char}" for char in updated_team["team"]))
+    else:
+        remaining = 3 - len(updated_team["team"])
+        await query.edit_message_text(f"🔹 **Selected:** {char_name}\n\n✅ Choose **{remaining} more**!")
+
+async def battle(update, context):
+    """Starts a PvP battle"""
+    if not context.args or len(context.args) != 1:
+        await update.message.reply_text("❌ **Usage:** `/battle @username`")
+        return
     
-    if not user or "battle_team" not in user or len(user["battle_team"]) != 3:
-        await update.message.reply_text("❌ You need to select a team first! Use `/maketeam`.")
-        return
-
-    if len(context.args) != 1 or not context.args[0].startswith("@"):
-        await update.message.reply_text("❌ Usage: `/challenge @username`")
-        return
-
-    opponent_username = context.args[0][1:]
-    opponent = await user_collection.find_one({"username": opponent_username})
-
+    opponent = update.message.mention_entities
     if not opponent:
-        await update.message.reply_text("❌ Opponent not found or they haven't played yet.")
+        await update.message.reply_text("❌ **Mention a valid opponent!**")
         return
 
-    if "battle_team" not in opponent or len(opponent["battle_team"]) != 3:
-        await update.message.reply_text("❌ Your opponent hasn't selected a team yet!")
+    user_id = update.effective_user.id
+    opponent_id = list(opponent.keys())[0]
+
+    user_team = await battle_collection.find_one({"user_id": user_id})
+    opponent_team = await battle_collection.find_one({"user_id": opponent_id})
+
+    if not user_team or len(user_team["team"]) < 3:
+        await update.message.reply_text("❌ **You must have a 3-character team to battle!** Use `/maketeam`.")
         return
 
-    battle_id = f"{user_id}_{opponent['id']}_{random.randint(1000, 9999)}"
-    
-    # ✅ Create battle entry
+    if not opponent_team or len(opponent_team["team"]) < 3:
+        await update.message.reply_text("❌ **Your opponent has not set a team!** Ask them to use `/maketeam`.")
+        return
+
+    battle_id = f"{user_id}_{opponent_id}_{int(time.time())}"
+
     battle_data = {
         "battle_id": battle_id,
-        "players": {str(user_id): user, str(opponent["id"]): opponent},
-        "turn": user_id,
-        "status": "ongoing",
-        "actions": [],
+        "player1": {"id": user_id, "team": user_team["team"], "hp": [MAX_HP, MAX_HP, MAX_HP]},
+        "player2": {"id": opponent_id, "team": opponent_team["team"], "hp": [MAX_HP, MAX_HP, MAX_HP]},
+        "turn": user_id,  # Player 1 starts
     }
+
     await battle_collection.insert_one(battle_data)
 
-    keyboard = [[InlineKeyboardButton("✅ Accept Challenge", callback_data=f"accept:{battle_id}")]]
-    await update.message.reply_text(
-        f"⚔️ **Battle Challenge!**\n\n"
-        f"👑 **{update.effective_user.first_name}** challenges **{opponent['username']}** to a 3v3 battle!\n"
-        "🔹 Opponent, click below to accept:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
+    keyboard = [[InlineKeyboardButton("⚔️ Attack", callback_data=f"attack:{battle_id}")]]
+    await update.message.reply_text(f"🔥 **PvP Battle Started!** 🔥\n\n🎴 **{update.effective_user.first_name}** vs **{context.bot.get_chat(opponent_id).first_name}**\n\n⚔️ **Turn:** {update.effective_user.first_name}",
+                                    reply_markup=InlineKeyboardMarkup(keyboard))
 
-# ✅ **Accept Challenge**
-async def accept_challenge(update: Update, context: CallbackContext) -> None:
-    """Handles challenge acceptance."""
+async def attack(update, context):
+    """Handles attack action"""
     query = update.callback_query
-    _, battle_id = query.data.split(":")
-    battle = await battle_collection.find_one({"battle_id": battle_id, "status": "ongoing"})
+    user_id = query.from_user.id
+    battle_id = query.data.split(":")[1]
 
+    battle = await battle_collection.find_one({"battle_id": battle_id})
     if not battle:
-        await query.answer("❌ Battle not found or already started!", show_alert=True)
+        await query.answer("❌ Battle not found!", show_alert=True)
         return
 
-    players = list(battle["players"].keys())
-    if str(query.from_user.id) not in players:
-        await query.answer("❌ You are not part of this battle!", show_alert=True)
+    if battle["turn"] != user_id:
+        await query.answer("❌ It's not your turn!", show_alert=True)
         return
 
-    await query.message.edit_text("⚔️ **Battle Started!** Turns will be taken automatically.")
+    opponent_id = battle["player2"]["id"] if battle["player1"]["id"] == user_id else battle["player1"]["id"]
+    opponent_hp = battle["player2"]["hp"] if battle["player1"]["id"] == user_id else battle["player1"]["hp"]
+    
+    damage = random.randint(15, 30)
+    opponent_hp[0] -= damage
 
-    await start_battle(battle_id, context)
-
-# ✅ **Start Battle**
-async def start_battle(battle_id, context: CallbackContext):
-    """Initiates the battle sequence."""
-    battle = await battle_collection.find_one({"battle_id": battle_id, "status": "ongoing"})
-    if not battle:
+    if opponent_hp[0] <= 0:
+        opponent_hp.pop(0)
+    
+    if len(opponent_hp) == 0:
+        await battle_collection.delete_one({"battle_id": battle_id})
+        await query.message.edit_text(f"🏆 **{update.effective_user.first_name} Wins!** 🏆")
         return
 
-    turn = battle["turn"]
-    await send_turn_prompt(battle_id, turn, context)
+    next_turn = opponent_id
+    await battle_collection.update_one({"battle_id": battle_id}, {"$set": {"turn": next_turn}})
+    
+    keyboard = [[InlineKeyboardButton("⚔️ Attack", callback_data=f"attack:{battle_id}")]]
+    await query.message.edit_text(f"⚔️ **Turn:** {context.bot.get_chat(next_turn).first_name}\n💥 **Damage Dealt:** {damage}",
+                                  reply_markup=InlineKeyboardMarkup(keyboard))
 
-# ✅ **Send Turn Prompt**
-async def send_turn_prompt(battle_id, player_id, context: CallbackContext):
-    """Sends turn options to the active player."""
-    battle = await battle_collection.find_one({"battle_id": battle_id, "status": "ongoing"})
-    if not battle:
-        return
-
-    keyboard = [
-        [InlineKeyboardButton("⚔ Attack", callback_data=f"attack:{battle_id}"),
-         InlineKeyboardButton("🛡 Defend", callback_data=f"defend:{battle_id}")],
-        [InlineKeyboardButton("🔥 Special Move", callback_data=f"special:{battle_id}"),
-         InlineKeyboardButton("🔄 Swap", callback_data=f"swap:{battle_id}")]
-    ]
-    player = battle["players"][str(player_id)]
-
-    await context.bot.send_message(
-        chat_id=player["id"],
-        text=f"🎮 **Your Turn!**\n\n"
-        f"🆚 **Battle:** {battle_id}\n"
-        "Choose an action:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
-
-# ✅ **Handle Actions**
-async def handle_action(update: Update, context: CallbackContext) -> None:
-    """Handles attack, defend, swap, and special moves."""
-    query = update.callback_query
-    action, battle_id = query.data.split(":")
-
-    battle = await battle_collection.find_one({"battle_id": battle_id, "status": "ongoing"})
-    if not battle:
-        await query.answer("❌ Battle ended!", show_alert=True)
-        return
-
-    turn_player = battle["turn"]
-    if query.from_user.id != turn_player:
-        await query.answer("❌ Not your turn!", show_alert=True)
-        return
-
-    # Simulate action effects (for now, just random)
-    damage = random.randint(10, 30)
-    next_turn = next(iter(battle["players"].keys())) if str(turn_player) != next(iter(battle["players"].keys())) else next(iter(battle["players"].values()))
-
-    await battle_collection.update_one({"battle_id": battle_id}, {"$set": {"turn": int(next_turn)}})
-
-    await query.message.edit_text(f"✅ {query.from_user.first_name} used {action.upper()}! ({damage} Damage)")
-
-    # Next turn
-    await asyncio.sleep(2)
-    await send_turn_prompt(battle_id, next_turn, context)
-
-# ✅ **Register Handlers**
-application.add_handler(CommandHandler("maketeam", maketeam, block=False))
-application.add_handler(CommandHandler("challenge", challenge, block=False))
-application.add_handler(CallbackQueryHandler(accept_challenge, pattern="^accept:", block=False))
-application.add_handler(CallbackQueryHandler(handle_action, pattern="^(attack|defend|special|swap):", block=False))
+# Register Handlers
+application.add_handler(CommandHandler("maketeam", make_team, block=False))
+application.add_handler(CommandHandler("battle", battle, block=False))
+application.add_handler(CallbackQueryHandler(select_team, pattern="^select_team:", block=False))
+application.add_handler(CallbackQueryHandler(attack, pattern="^attack:", block=False))

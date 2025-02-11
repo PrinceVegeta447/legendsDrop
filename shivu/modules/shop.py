@@ -11,7 +11,7 @@ pending_purchases = {}  # Tracks purchase type (cc/ticket)
 shop_sessions = {}       # Tracks user who opened the shop
 
 async def shop(update: Update, context: CallbackContext) -> None:
-    """Displays the shop menu with better UI & inline buttons."""
+    """Displays the shop menu with enhanced UI & inline buttons."""
     user_id = update.effective_user.id
     user = await user_collection.find_one({'id': user_id}) or {}
 
@@ -21,16 +21,16 @@ async def shop(update: Update, context: CallbackContext) -> None:
 
     # 🎨 **Shop UI Message**
     shop_message = (
-        f"🛒 <b>Welcome to the Shop, Warrior!</b>\n\n"
+        f"<b>🛒 Welcome to the Shop, Warrior!</b>\n\n"
         f"💰 <b>Your Zeni:</b> <code>{coins}</code>\n"
         f"💎 <b>Chrono Crystals:</b> <code>{chrono_crystals}</code>\n"
         f"🎟 <b>Summon Tickets:</b> <code>{summon_tickets}</code>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🔹 <b>Available Items:</b>\n"
-        f"   ├ 💎 <b>Chrono Crystals</b> - {CC_PRICE} Zeni each\n"
-        f"   └ 🎟 <b>Summon Tickets</b> - {TICKET_PRICE} Zeni each\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📌 Select an item below to purchase:"
+        f"   ├ 💎 <b>Chrono Crystals</b> → <code>{CC_PRICE}</code> Zeni each\n"
+        f"   └ 🎟 <b>Summon Tickets</b> → <code>{TICKET_PRICE}</code> Zeni each\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 <i>Select an item below to purchase:</i>"
     )
 
     # 🛍 **Shop Buttons**

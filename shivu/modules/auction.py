@@ -10,7 +10,7 @@ AUCTION_DURATION = 600  # 10 minutes
 # ✅ Start an Auction (Only Owners)
 async def start_auction(update: Update, context: CallbackContext) -> None:
     """Allows owners to start an auction in the designated channel."""
-    if update.effective_user.id != OWNER_ID:
+    if str(update.effective_user.id) != OWNER_ID:
         await update.message.reply_text("❌ Only the bot owner can start an auction!")
         return
 

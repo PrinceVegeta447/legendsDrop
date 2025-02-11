@@ -8,7 +8,7 @@ BATTLE_TIMEOUT = 120  # 2 minutes per turn
 
 # ✅ **Team Selection**
 async def maketeam(update: Update, context: CallbackContext) -> None:
-    """Allows users to select a 3-character team before battle."""
+    """Allows users to select a unique 3-character team before battle."""
     user_id = update.effective_user.id
     user = await user_collection.find_one({"id": user_id})
 
@@ -24,21 +24,26 @@ async def maketeam(update: Update, context: CallbackContext) -> None:
         )
         return
 
-    selected_ids = set(context.args)  # Convert to set for faster lookup
-    available_ids = {char["id"] for char in user["characters"]}  # Set of user's character IDs
+    selected_ids = list(set(context.args))  # Remove duplicates while keeping order
 
-    if not selected_ids.issubset(available_ids):
+    if len(selected_ids) != 3:
+        await update.message.reply_text("❌ You must select **exactly 3 unique characters**!")
+        return
+
+    # ✅ Ensure selected characters exist in user's collection (without duplicates)
+    available_characters = {char["id"]: char for char in user["characters"]}
+    team = [available_characters[cid] for cid in selected_ids if cid in available_characters]
+
+    if len(team) != 3:
         await update.message.reply_text("❌ Invalid selection! Make sure all 3 IDs are from your collection.")
         return
 
-    team = [char for char in user["characters"] if char["id"] in selected_ids]
-
-    # ✅ Save team to the database
+    # ✅ Save the unique team to the database
     await user_collection.update_one({"id": user_id}, {"$set": {"battle_team": team}})
 
     team_preview = "\n".join([f"🎴 {char['name']} ({char['rarity']})" for char in team])
     await update.message.reply_text(
-        f"✅ **Team Selected Successfully!**\n"
+        f"✅ **Team Saved Successfully!**\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
         f"{team_preview}\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"

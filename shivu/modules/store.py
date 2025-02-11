@@ -95,7 +95,7 @@ async def store(update: Update, context: CallbackContext) -> None:
     store_message += "🔹 Use `/refreshstore` to refresh the store.\n"
     store_message += "💰 Use `/storebuy <character_id>` to purchase a character."
 
-    await update.message.reply_text(store_message, parse_mode="HTML")
+    await update.message.reply_text(store_message, parse_mode="Markdown")
 
 async def refresh_store(update: Update, context: CallbackContext) -> None:
     """Allows users to refresh the store, with one free refresh per day."""

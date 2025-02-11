@@ -15,7 +15,7 @@ RARITY_PRICES = {
     "🔱 Ultra": 250000
 }
 FREE_REFRESH_LIMIT = 1
-REFRESH_COST = 25000  # Cost after free refresh is used
+REFRESH_COST = 25000  # Cost after free refresh
 
 CATEGORY_MAPPING = {
     "1": "🏆 Saiyan",
@@ -39,26 +39,27 @@ CATEGORY_MAPPING = {
 }
 
 async def generate_store():
-    """Generates a new daily store with 10 random characters from the `collection` database."""
+    """Generates a new daily store with 10 random characters, fetching details from `collection`."""
     available_characters = await collection.find({"rarity": {"$nin": EXCLUDED_RARITIES}}).to_list(None)
     if len(available_characters) < 10:
-        return []  # Not enough characters
+        return []
 
     store = []
-    selected_characters = random.sample(available_characters, 10)  # Select 10 random characters
+    selected_characters = random.sample(available_characters, 10)
 
     for char in selected_characters:
-        price = RARITY_PRICES.get(char["rarity"], 999999)  # Assign price based on rarity
-        char_data = {
+        price = RARITY_PRICES.get(char["rarity"], 999999)
+        category = CATEGORY_MAPPING.get(char.get("category", "0"), "Unknown")  # Default category handling
+        store.append({
             "id": char["id"],
             "name": char["name"],
             "rarity": char["rarity"],
-            "category": CATEGORY_MAPPING.get(char.get("category"), "Unknown"),
-            "price": price
-        }
-        store.append(char_data)
+            "category": category,
+            "price": price,
+            "file_id": char.get("file_id"),  # Ensure image support
+            "img_url": char.get("img_url")
+        })
 
-    # ✅ Save Store to Database
     await store_collection.delete_many({})
     await store_collection.insert_one({"date": time.strftime("%Y-%m-%d"), "characters": store})
     return store
@@ -84,11 +85,11 @@ async def store(update: Update, context: CallbackContext) -> None:
     store_message = "<b>🛒 Today's Character Store</b>\n━━━━━━━━━━━━━━━━━━━━\n"
     for char in characters:
         store_message += (
-    f"{char['rarity']} <b>{char['name']}</b>\n"
-    f"🏷 <b>Category:</b> {char['category']}\n"
-    f"💰 <b>Price:</b> {char['price']} Zeni\n"
-    f"🆔 <b>Character ID:</b> <code>{char['id']}</code>\n"  # ✅ FIXED  # ✅ Fixed formatting
-    "━━━━━━━━━━━━━━━━━━━━\n"
+            f"{char['rarity']} <b>{char['name']}</b>\n"
+            f"🏷 <b>Category:</b> {char['category']}\n"
+            f"💰 <b>Price:</b> {char['price']} Zeni\n"
+            f"🆔 Character ID: <code>{char['id']}</code>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
         )
 
     store_message += "🔹 Use `/refreshstore` to refresh the store.\n"
@@ -104,18 +105,18 @@ async def refresh_store(update: Update, context: CallbackContext) -> None:
     user.setdefault("coins", 0)
 
     if user["store_refreshes"] < FREE_REFRESH_LIMIT:
-        await generate_store()
         await user_collection.update_one({"id": user_id}, {"$inc": {"store_refreshes": 1}})
-        await update.message.reply_text("✅ Store refreshed for free!")
+        await generate_store()
+        await update.message.reply_text("✅ Store refreshed for free!", parse_mode="HTML")
     elif user["coins"] >= REFRESH_COST:
         await user_collection.update_one({"id": user_id}, {"$inc": {"coins": -REFRESH_COST, "store_refreshes": 1}})
         await generate_store()
-        await update.message.reply_text(f"✅ Store refreshed! You spent {REFRESH_COST} Zeni.")
+        await update.message.reply_text(f"✅ Store refreshed! You spent {REFRESH_COST} Zeni.", parse_mode="HTML")
     else:
-        await update.message.reply_text("❌ Not enough Zeni to refresh!")
+        await update.message.reply_text("❌ Not enough Zeni to refresh!", parse_mode="HTML")
         return
 
-    await store(update, context)  # Re-send the updated store
+    await store(update, context)
 
 async def buy_store_character(update: Update, context: CallbackContext) -> None:
     """Handles buying a character from the store."""
@@ -129,8 +130,7 @@ async def buy_store_character(update: Update, context: CallbackContext) -> None:
 
     # ✅ Fetch User Data
     user = await user_collection.find_one({"id": user_id}) or {}
-    user.setdefault("characters", [])
-    user_coins = int(user.get("coins", 0))  # ✅ Fetches from "coins"
+    user_coins = int(user.get("coins", 0))
 
     # ✅ Fetch Store Data
     store_data = await store_collection.find_one({})
@@ -144,7 +144,7 @@ async def buy_store_character(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ **Invalid character ID!**", parse_mode="Markdown")
         return
 
-    price = character.get("price", 999999)  # Ensure price exists
+    price = int(character["price"])
 
     # ✅ Check Zeni Balance
     if user_coins < price:
@@ -171,8 +171,7 @@ async def buy_store_character(update: Update, context: CallbackContext) -> None:
         parse_mode="Markdown"
     )
 
-
-# ✅ **Register Handlers**
+# ✅ **Register Handler**
 application.add_handler(CommandHandler("storebuy", buy_store_character, block=False))
 application.add_handler(CommandHandler("store", store, block=False))
 application.add_handler(CommandHandler("refreshstore", refresh_store, block=False))

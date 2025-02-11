@@ -1,19 +1,17 @@
 import asyncio
 import time
+from bson import ObjectId
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
-from shivu import application, user_collection, collection, OWNER_ID, auction_collection
-from datetime import datetime
-from bson import ObjectId
-from telegram.constants import ParseMode
+from shivu import application, user_collection, collection, auction_collection, OWNER_ID
 
-
-# ✅ Auction Duration (Seconds)
+# ✅ Auction Configurations
 AUCTION_DURATION = 600  # 10 minutes
+MIN_BID_INCREMENT = 200  # Minimum bid increase
 
-# ✅ Start an Auction (Only Owners)
+# ✅ Start an Auction (Only Owner)
 async def start_auction(update: Update, context: CallbackContext) -> None:
-    """Allows owners to start an auction in the designated channel."""
+    """Allows the bot owner to start an auction in the channel."""
     if str(update.effective_user.id) != OWNER_ID:
         await update.message.reply_text("❌ Only the bot owner can start an auction!")
         return
@@ -31,7 +29,7 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
     try:
         starting_bid = int(starting_bid)
     except ValueError:
-        await update.message.reply_text("❌ **Invalid starting bid!** It must be a number.", parse_mode="Markdown")
+        await update.message.reply_text("❌ **Invalid starting bid!** Must be a number.", parse_mode="Markdown")
         return
 
     # ✅ Fetch character details
@@ -55,7 +53,7 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
 
     # ✅ Send Auction Message in Channel
     auction_message = (
-        f"⚔ **Auction Started!**\n"
+        f"🏆 **Auction Started!**\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🎴 **Character:** {character['name']}\n"
         f"🎖 **Rarity:** {character.get('rarity', 'Unknown')}\n"
@@ -91,13 +89,6 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
     await end_auction(auction_doc.inserted_id, context)
 
 # ✅ Handle Bids
-  # ✅ Ensure MongoDB ID is used correctly
-
-def escape_markdown_v2(text):
-    """Escapes special characters in MarkdownV2 to prevent parsing errors."""
-    escape_chars = r"_*[]()~`>#+-=|{}.!"
-    return "".join(f"\\{char}" if char in escape_chars else char for char in text)
-
 async def handle_bid(update: Update, context: CallbackContext) -> None:
     """Processes user bids in the auction."""
     query = update.callback_query
@@ -105,10 +96,10 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
     bid_increment = int(bid_increment)
     user_id = query.from_user.id
 
-    # ✅ Fetch the latest auction details
+    # ✅ Fetch auction details
     auction = await auction_collection.find_one({"_id": ObjectId(auction_id), "status": "ongoing"})
     if not auction:
-        await query.answer("❌ The auction has ended!", show_alert=True)
+        await query.answer("❌ Auction has ended!", show_alert=True)
         return
 
     # ✅ Check if auction has expired
@@ -145,40 +136,36 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
         {"$set": {"highest_bid": new_bid, "highest_bidder": user_id}}
     )
 
-    # ✅ Escape auction message for MarkdownV2
-    char_name = escape_markdown_v2(auction["character"]["name"])
-    char_rarity = escape_markdown_v2(auction["character"].get("rarity", "Unknown"))
-    highest_bidder = f"@{query.from_user.username}" if query.from_user.username else f"[User](tg://user?id={user_id})"
-
-    # ✅ Edit auction message (MarkdownV2 Safe)
+    # ✅ Update Auction Message
     auction_message = (
-        f"⚔ *Auction Ongoing!*\n"
+        f"🏆 **Auction Update**\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🎴 *Character:* `{char_name}`\n"
-        f"🎖 *Rarity:* `{char_rarity}`\n"
-        f"💰 *Highest Bid:* `{new_bid} CC`\n"
-        f"👤 *Highest Bidder:* {highest_bidder}\n"
-        f"📌 *Auction ends soon!*"
+        f"🎴 **Character:** {auction['character']['name']}\n"
+        f"🎖 **Rarity:** {auction['character'].get('rarity', 'Unknown')}\n"
+        f"💰 **Highest Bid:** {new_bid} CC\n"
+        f"👤 **Highest Bidder:** @{query.from_user.username if query.from_user.username else 'Unknown'}\n"
+        f"📌 **Auction ends soon!**"
     )
 
     keyboard = [
-        [InlineKeyboardButton(f"💎 Bid +200 CC", callback_data=f"bid:{auction_id}:200")],
-        [InlineKeyboardButton(f"💰 Bid +500 CC", callback_data=f"bid:{auction_id}:500")]
+        [InlineKeyboardButton("💎 Bid +200 CC", callback_data=f"bid:{auction_id}:200")],
+        [InlineKeyboardButton("💰 Bid +500 CC", callback_data=f"bid:{auction_id}:500")]
     ]
 
     await context.bot.edit_message_caption(
         chat_id=auction["channel_id"],
         message_id=auction["message_id"],
         caption=auction_message,
-        parse_mode=ParseMode.MARKDOWN_V2,
+        parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
     await query.answer(f"✅ You bid {new_bid} CC!")
+
 # ✅ End Auction
 async def end_auction(auction_id, context: CallbackContext) -> None:
     """Ends the auction and gives the character to the highest bidder."""
-    auction = await auction_collection.find_one({"_id": auction_id})
+    auction = await auction_collection.find_one({"_id": ObjectId(auction_id)})
     if not auction or auction["status"] != "ongoing":
         return
 
@@ -187,15 +174,15 @@ async def end_auction(auction_id, context: CallbackContext) -> None:
     character = auction["character"]
 
     # ✅ Update auction status
-    await auction_collection.update_one({"_id": auction_id}, {"$set": {"status": "ended"}})
+    await auction_collection.update_one({"_id": ObjectId(auction_id)}, {"$set": {"status": "ended"}})
 
     if not highest_bidder:
         auction_message = f"❌ **Auction Ended! No bids were placed.**"
     else:
-        # ✅ Deduct CC & Add Character
+        # ✅ Add Character to Winner
         await user_collection.update_one(
             {"id": highest_bidder},
-            {"$inc": {"chrono_crystals": -highest_bid}, "$push": {"characters": character}}
+            {"$push": {"characters": character}}
         )
 
         auction_message = (
@@ -211,51 +198,6 @@ async def end_auction(auction_id, context: CallbackContext) -> None:
         message_id=auction["message_id"],
         caption=auction_message,
         parse_mode="HTML"
-    )
-
-
-async def bid_callback(update: Update, context: CallbackContext) -> None:
-    query = update.callback_query
-    user_id = query.from_user.id
-    auction = await auction_collection.find_one({"status": "ongoing"})  # Fetch the latest auction
-
-    if not auction:
-        await query.answer("❌ The auction has ended!", show_alert=True)
-        return
-
-    current_bid = auction["current_bid"]
-    min_increment = 200
-    new_bid = current_bid + min_increment
-
-    user = await user_collection.find_one({"id": user_id})
-    if not user or user.get("chrono_crystals", 0) < new_bid:
-        await query.answer("❌ Not enough Chrono Crystals!", show_alert=True)
-        return
-
-    # Update Auction with New Bid
-    await auction_collection.update_one(
-        {"_id": auction["_id"]}, 
-        {"$set": {"current_bid": new_bid, "highest_bidder": user_id}}
-    )
-
-    await query.answer(f"✅ You placed a bid of {new_bid} Chrono Crystals!", show_alert=True)
-
-    # Update Auction Message
-    bid_message = (
-        f"🏆 <b>Auction Update</b>\n"
-        f"🔹 Current Bid: <b>{new_bid} Chrono Crystals</b>\n"
-        f"👤 Highest Bidder: @{query.from_user.username or 'Unknown'}\n"
-        f"🔹 Minimum Next Bid: {new_bid + min_increment} CC\n\n"
-        f"🚀 Keep bidding to win!"
-    )
-    await context.bot.edit_message_text(
-        chat_id=auction["channel_id"],
-        message_id=auction["message_id"],
-        text=bid_message,
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton(f"💎 Bid {new_bid + min_increment} CC", callback_data="bid")]
-        ])
     )
 
 # ✅ Register Handlers

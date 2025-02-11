@@ -1,6 +1,6 @@
 import time, random
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from database import user_collection, adventure_collection
+from shivu import user_collection, adventure_collection
 from telegram.ext import CommandHandler, CallbackQueryHandler
 
 ADVENTURE_TYPES = {

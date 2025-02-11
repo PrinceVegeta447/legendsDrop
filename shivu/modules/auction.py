@@ -133,36 +133,36 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
     # ✅ Deduct CC & Update Auction
     await user_collection.update_one(
         {"id": user_id},
-        {"$inc": {"chrono_crystals": -new_bid}}
+        {"$inc": {"chrono_crystals": -bid_increment}}
     )
     await auction_collection.update_one(
         {"_id": ObjectId(auction_id)},
         {"$set": {"highest_bid": new_bid, "highest_bidder": user_id}}
     )
 
-# ✅ Edit auction message (Use MarkdownV2)
-auction_message = (
-    f"⚔ *Auction Ongoing!*\n"
-    f"━━━━━━━━━━━━━━━━━━━━\n"
-    f"🎴 *Character:* `{auction['character']['name']}`\n"
-    f"🎖 *Rarity:* `{auction['character'].get('rarity', 'Unknown')}`\n"
-    f"💰 *Highest Bid:* `{new_bid} CC`\n"
-    f"👤 *Highest Bidder:* @{query.from_user.username if query.from_user.username else 'Unknown'}\n"
-    f"📌 *Auction ends soon!*"
-)
+    # ✅ Edit auction message (Use MarkdownV2)
+    auction_message = (
+        f"⚔ *Auction Ongoing!*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🎴 *Character:* `{auction['character']['name']}`\n"
+        f"🎖 *Rarity:* `{auction['character'].get('rarity', 'Unknown')}`\n"
+        f"💰 *Highest Bid:* `{new_bid} CC`\n"
+        f"👤 *Highest Bidder:* @{query.from_user.username if query.from_user.username else 'Unknown'}\n"
+        f"📌 *Auction ends soon!*"
+    )
 
-keyboard = [
-    [InlineKeyboardButton(f"💎 Bid +200 CC", callback_data=f"bid:{auction_id}:200")],
-    [InlineKeyboardButton(f"💰 Bid +500 CC", callback_data=f"bid:{auction_id}:500")]
-]
+    keyboard = [
+        [InlineKeyboardButton(f"💎 Bid +200 CC", callback_data=f"bid:{auction_id}:200")],
+        [InlineKeyboardButton(f"💰 Bid +500 CC", callback_data=f"bid:{auction_id}:500")]
+    ]
 
-await context.bot.edit_message_caption(
-    chat_id=auction["channel_id"],
-    message_id=auction["message_id"],
-    caption=auction_message,
-    parse_mode=ParseMode.MARKDOWN_V2,  # ✅ Using MarkdownV2 for safety
-    reply_markup=InlineKeyboardMarkup(keyboard)
-)
+    await context.bot.edit_message_caption(
+        chat_id=auction["channel_id"],
+        message_id=auction["message_id"],
+        caption=auction_message,
+        parse_mode=ParseMode.MARKDOWN_V2,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
     await query.answer(f"✅ You bid {new_bid} CC!")
 # ✅ End Auction

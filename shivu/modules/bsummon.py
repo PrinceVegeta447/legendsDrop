@@ -13,7 +13,13 @@ RARITY_ORDER = [
     "⚪ Common", "🟢 Uncommon", "🔵 Rare", "🟣 Extreme",
     "🟡 Sparking", "🔱 Ultra", "💠 Legends Limited",
     "🔮 Zenkai", "🏆 Event-Exclusive"
-]  # Defines rarity order for sorting
+]
+
+DROP_RATES = {
+    "⚪ Common": 40, "🟢 Uncommon": 25, "🔵 Rare": 15, "🟣 Extreme": 10,
+    "🟡 Sparking": 6, "🔱 Ultra": 2, "💠 Legends Limited": 1,
+    "🔮 Zenkai": 0.5, "🏆 Event-Exclusive": 0.5
+}
 
 ANIMATION_FRAMES = [
     "🔮 **Summoning…** 🔮",
@@ -21,10 +27,10 @@ ANIMATION_FRAMES = [
     "🌪 **Summon Portal Opening…** 🌪",
     "💥 **Characters Emerging…** 💥",
     "✨ **Summon Complete!** ✨"
-]  # Summon animation frames
+]
 
 async def summon(update: Update, context: CallbackContext) -> None:
-    """Handles user summon request from a banner with enhanced UI and animations."""
+    """Handles user summon request with enhanced UI and animations."""
     user_id = update.effective_user.id
     args = context.args
 
@@ -32,18 +38,20 @@ async def summon(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ **Usage:** `/bsummon <banner_id> <1/10> <cc/ticket>`", parse_mode="Markdown")
         return
 
-    banner_id, summon_count, currency = args[0], int(args[1]), args[2].lower()
-    if summon_count not in [1, 10] or currency not in ["cc", "ticket"]:
+    try:
+        banner_id, summon_count, currency = args[0], int(args[1]), args[2].lower()
+    except ValueError:
         await update.message.reply_text("❌ **Invalid arguments!**\nUse: `/bsummon <banner_id> <1/10> <cc/ticket>`", parse_mode="Markdown")
         return
 
-    try:
-        banner = await banners_collection.find_one({"_id": ObjectId(banner_id)})
-        if not banner:
-            await update.message.reply_text("❌ **No banner found with this ID!**", parse_mode="Markdown")
-            return
-    except:
-        await update.message.reply_text("❌ **Invalid Banner ID!**", parse_mode="Markdown")
+    if summon_count not in [1, 10] or currency not in ["cc", "ticket"]:
+        await update.message.reply_text("❌ **Invalid summon count or currency!**\nUse: `/bsummon <banner_id> <1/10> <cc/ticket>`", parse_mode="Markdown")
+        return
+
+    # ✅ Fetch banner details
+    banner = await banners_collection.find_one({"_id": ObjectId(banner_id)})
+    if not banner:
+        await update.message.reply_text("❌ **No banner found with this ID!**", parse_mode="Markdown")
         return
 
     banner_characters = banner.get("characters", [])
@@ -51,12 +59,13 @@ async def summon(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ **No characters available in this banner!**", parse_mode="Markdown")
         return
 
-    # ✅ Fetch user data
+    # ✅ Fetch or create user profile
     user = await user_collection.find_one({'id': user_id})
     if not user:
-        await update.message.reply_text("❌ **You don't have enough resources to summon!**", parse_mode="Markdown")
-        return
+        user = {"id": user_id, "chrono_crystals": 0, "summon_tickets": 0, "characters": []}
+        await user_collection.insert_one(user)
 
+    # ✅ Check user balance
     total_cost = (SUMMON_COST_CC if currency == "cc" else SUMMON_COST_TICKET) * summon_count
     balance_key = "chrono_crystals" if currency == "cc" else "summon_tickets"
 
@@ -70,46 +79,48 @@ async def summon(update: Update, context: CallbackContext) -> None:
     # ✅ Start Summon Animation
     animation_message = await update.message.reply_text("🔮 **Summoning…**")
     for frame in ANIMATION_FRAMES:
-        await asyncio.sleep(1.2)  # Delay between animation frames
+        await asyncio.sleep(1.2)
         await animation_message.edit_text(frame, parse_mode="Markdown")
 
-    # ✅ Select random characters
-    summoned_characters = random.sample(banner_characters, min(summon_count, len(banner_characters)))
+    # ✅ Weighted Character Selection
+    def get_weighted_character():
+        available_characters = sorted(banner_characters, key=lambda c: DROP_RATES.get(c.get("rarity", "⚪ Common"), 0), reverse=True)
+        weights = [DROP_RATES.get(c.get("rarity", "⚪ Common"), 0) for c in available_characters]
+        return random.choices(available_characters, weights=weights, k=1)[0]
+
+    summoned_characters = [get_weighted_character() for _ in range(summon_count)]
 
     # ✅ Add to user's collection
     await user_collection.update_one({'id': user_id}, {'$push': {'characters': {'$each': summoned_characters}}})
 
     # ✅ Identify rarest character
     rarest_character = max(summoned_characters, key=lambda char: RARITY_ORDER.index(char.get('rarity', "⚪ Common")))
+    rarest_image = rarest_character.get('file_id', "https://i.imgur.com/5h9N2JF.png")  # High-quality default image
 
-    # ✅ Check if rarest character has an image
-    rarest_image = rarest_character.get('file_id')
-    if not rarest_image:
-        rarest_image = "https://example.com/default_image.jpg"  # Set a default image if missing
-
-    # ✅ Create summon result message with a structured format
+    # ✅ Summon Result Message with Improved Formatting
     summon_results = (
         f"🎟 **Summon Results - {banner['name']}** 🎟\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
     )
     
     for char in summoned_characters:
-        summon_results += f"🔹 **{char['name']}**\n" \
-                          f"🎖 **Rarity:** {char['rarity']}\n" \
-                          f"🔹 **Category:** {char['category']}\n" \
+        new_tag = "🔥 **NEW!**" if char not in user.get("characters", []) else ""
+        summon_results += f"🔹 **{char.get('name', 'Unknown')}** {new_tag}\n" \
+                          f"🎖 **Rarity:** {char.get('rarity', '⚪ Common')}\n" \
+                          f"📌 **Category:** {char.get('category', 'N/A')}\n" \
                           f"━━━━━━━━━━━━━━━━━━━━━━\n"
 
-    keyboard = [[InlineKeyboardButton("📜 View Collection", switch_inline_query_current_chat=f"collection.{user_id}")]]
+    keyboard = [[InlineKeyboardButton("💠 View Full Collection", switch_inline_query_current_chat=f"collection.{user_id}")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # ✅ Send rarest character’s image & results
+    # ✅ Send summon result with rarest character’s image
     await animation_message.delete()
     await update.message.reply_photo(
         photo=rarest_image,
-        caption=summon_results,
+        caption=f"✨ **Your Rarest Pull!** ✨\n\n{summon_results}",
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
 
-# ✅ Add Handlers
+# ✅ Add Command Handler
 application.add_handler(CommandHandler("bsummon", summon, block=False))

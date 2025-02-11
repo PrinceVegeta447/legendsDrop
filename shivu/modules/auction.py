@@ -9,7 +9,6 @@ from shivu import application, user_collection, collection, OWNER_ID, auction_co
 AUCTION_DURATION = 600  # 10 minutes
 MIN_BID_INCREMENT = 200  # Minimum bid increment in CC
 
-# ✅ Start an Auction (Only Owners)
 async def start_auction(update: Update, context: CallbackContext) -> None:
     """Allows owners to start an auction in the designated channel."""
     if update.effective_user.id != int(OWNER_ID):
@@ -30,6 +29,12 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
         starting_bid = int(starting_bid)
     except ValueError:
         await update.message.reply_text("❌ **Invalid starting bid!** It must be a number.", parse_mode="Markdown")
+        return
+
+    # ✅ Check if an auction is already running
+    active_auction = await auction_collection.find_one({"status": "ongoing"})
+    if active_auction:
+        await update.message.reply_text("❌ **An auction is already active!** Please wait for it to end.")
         return
 
     # ✅ Fetch character details
@@ -88,7 +93,6 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
     await asyncio.sleep(AUCTION_DURATION)
     await end_auction(auction_doc.inserted_id, context)
 
-# ✅ Handle Bids
 async def handle_bid(update: Update, context: CallbackContext) -> None:
     """Processes user bids in the auction."""
     query = update.callback_query
@@ -102,7 +106,11 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
         await query.answer("❌ Auction has ended!", show_alert=True)
         return
 
-    # ✅ Ensure bid is higher than current highest bid
+    # ✅ Prevent self-bidding if already highest bidder
+    if auction["highest_bidder"] == user_id:
+        await query.answer("⚠ You are already the highest bidder!", show_alert=True)
+        return
+
     highest_bid = auction["highest_bid"]
     new_bid = highest_bid + bid_increment
 
@@ -167,29 +175,14 @@ async def end_auction(auction_id, context: CallbackContext) -> None:
     if not highest_bidder:
         auction_message = "❌ **Auction Ended! No bids were placed.**"
     else:
-        # ✅ Deduct CC from winner
-        result = await user_collection.update_one(
-            {"id": highest_bidder, "chrono_crystals": {"$gte": highest_bid}},  # Ensure enough CC
-            {"$inc": {"chrono_crystals": -highest_bid}, "$push": {"characters": character}}
+        auction_message = (
+            f"🏆 **Auction Ended!**\n"
+            f"🎴 **Winner:** <a href='tg://user?id={highest_bidder}'>User {highest_bidder}</a>\n"
+            f"💰 **Winning Bid:** {highest_bid} CC\n"
+            f"🎖 **Character:** {character['name']}\n"
+            f"📌 **Congratulations to the winner!**"
         )
 
-        if result.modified_count > 0:
-            auction_message = (
-                f"🏆 **Auction Ended!**\n"
-                f"🎴 **Winner:** <a href='tg://user?id={highest_bidder}'>User {highest_bidder}</a>\n"
-                f"💰 **Winning Bid:** {highest_bid} CC\n"
-                f"🎖 **Character:** {character['name']}\n"
-                f"📌 **Congratulations to the winner!**"
-            )
-        else:
-            auction_message = (
-                f"⚠ **Auction Ended, but there was an issue deducting CC!**\n"
-                f"🆔 Winner: <a href='tg://user?id={highest_bidder}'>User {highest_bidder}</a>\n"
-                f"💰 Winning Bid: {highest_bid} CC\n"
-                f"❗ Please check their CC balance manually!"
-            )
-
-    # ✅ Update auction message
     await context.bot.edit_message_caption(
         chat_id=auction["channel_id"],
         message_id=auction["message_id"],
@@ -197,6 +190,5 @@ async def end_auction(auction_id, context: CallbackContext) -> None:
         parse_mode="HTML"
     )
 
-# ✅ Register Handlers
 application.add_handler(CommandHandler("auction", start_auction, block=False))
 application.add_handler(CallbackQueryHandler(handle_bid, pattern="^bid:", block=False))

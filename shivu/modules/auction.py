@@ -3,6 +3,8 @@ import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
 from shivu import application, user_collection, collection, OWNER_ID, auction_collection
+from datetime import datetime
+from bson import ObjectId
 
 # ✅ Auction Duration (Seconds)
 AUCTION_DURATION = 600  # 10 minutes
@@ -87,6 +89,8 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
     await end_auction(auction_doc.inserted_id, context)
 
 # ✅ Handle Bids
+  # ✅ Ensure MongoDB ID is used correctly
+
 async def handle_bid(update: Update, context: CallbackContext) -> None:
     """Processes user bids in the auction."""
     query = update.callback_query
@@ -94,11 +98,22 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
     bid_increment = int(bid_increment)
     user_id = query.from_user.id
 
-    # ✅ Fetch auction details
-    auction = await auction_collection.find_one({"_id": auction_id, "status": "ongoing"})
+    # ✅ Fetch the latest auction details
+    auction = await auction_collection.find_one({"_id": ObjectId(auction_id), "status": "ongoing"})
     if not auction:
-        await query.answer("❌ Auction has ended!", show_alert=True)
+        await query.answer("❌ The auction has ended!", show_alert=True)
         return
+
+    # ✅ Check if auction has expired
+    current_time = time.time()
+    if current_time >= auction["end_time"]:
+        await auction_collection.update_one({"_id": ObjectId(auction_id)}, {"$set": {"status": "ended"}})
+        await query.answer("❌ The auction has ended!", show_alert=True)
+        return
+
+    # ✅ Ensure bid is higher than current highest bid
+    highest_bid = auction["highest_bid"]
+    new_bid = highest_bid + bid_increment
 
     # ✅ Fetch user details
     user = await user_collection.find_one({"id": user_id})
@@ -107,16 +122,19 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
         return
 
     user_cc = int(user.get("chrono_crystals", 0))
-    new_bid = auction["highest_bid"] + bid_increment
 
     # ✅ Check if user has enough CC
     if user_cc < new_bid:
-        await query.answer("❌ Not enough Chrono Crystals!", show_alert=True)
+        await query.answer(f"❌ Not enough CC! You need {new_bid}, but you have {user_cc}.", show_alert=True)
         return
 
-    # ✅ Update auction with new highest bid
+    # ✅ Deduct CC & Update Auction
+    await user_collection.update_one(
+        {"id": user_id},
+        {"$inc": {"chrono_crystals": -new_bid}}
+    )
     await auction_collection.update_one(
-        {"_id": auction_id},
+        {"_id": ObjectId(auction_id)},
         {"$set": {"highest_bid": new_bid, "highest_bidder": user_id}}
     )
 
@@ -132,8 +150,8 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
     )
 
     keyboard = [
-        [InlineKeyboardButton("💎 Bid +200 CC", callback_data=f"bid:{auction_id}:200")],
-        [InlineKeyboardButton("💰 Bid +500 CC", callback_data=f"bid:{auction_id}:500")]
+        [InlineKeyboardButton(f"💎 Bid +200 CC", callback_data=f"bid:{auction_id}:200")],
+        [InlineKeyboardButton(f"💰 Bid +500 CC", callback_data=f"bid:{auction_id}:500")]
     ]
 
     await context.bot.edit_message_caption(
@@ -145,7 +163,6 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
     )
 
     await query.answer(f"✅ You bid {new_bid} CC!")
-
 # ✅ End Auction
 async def end_auction(auction_id, context: CallbackContext) -> None:
     """Ends the auction and gives the character to the highest bidder."""

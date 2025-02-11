@@ -184,6 +184,51 @@ async def end_auction(auction_id, context: CallbackContext) -> None:
         parse_mode="HTML"
     )
 
+
+async def bid_callback(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    user_id = query.from_user.id
+    auction = await auction_collection.find_one({"status": "ongoing"})  # Fetch the latest auction
+
+    if not auction:
+        await query.answer("❌ The auction has ended!", show_alert=True)
+        return
+
+    current_bid = auction["current_bid"]
+    min_increment = 200
+    new_bid = current_bid + min_increment
+
+    user = await user_collection.find_one({"id": user_id})
+    if not user or user.get("chrono_crystals", 0) < new_bid:
+        await query.answer("❌ Not enough Chrono Crystals!", show_alert=True)
+        return
+
+    # Update Auction with New Bid
+    await auction_collection.update_one(
+        {"_id": auction["_id"]}, 
+        {"$set": {"current_bid": new_bid, "highest_bidder": user_id}}
+    )
+
+    await query.answer(f"✅ You placed a bid of {new_bid} Chrono Crystals!", show_alert=True)
+
+    # Update Auction Message
+    bid_message = (
+        f"🏆 <b>Auction Update</b>\n"
+        f"🔹 Current Bid: <b>{new_bid} Chrono Crystals</b>\n"
+        f"👤 Highest Bidder: @{query.from_user.username or 'Unknown'}\n"
+        f"🔹 Minimum Next Bid: {new_bid + min_increment} CC\n\n"
+        f"🚀 Keep bidding to win!"
+    )
+    await context.bot.edit_message_text(
+        chat_id=auction["channel_id"],
+        message_id=auction["message_id"],
+        text=bid_message,
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton(f"💎 Bid {new_bid + min_increment} CC", callback_data="bid")]
+        ])
+    )
+
 # ✅ Register Handlers
 application.add_handler(CommandHandler("auction", start_auction, block=False))
 application.add_handler(CallbackQueryHandler(handle_bid, pattern="^bid:", block=False))

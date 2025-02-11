@@ -93,6 +93,11 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
 # ✅ Handle Bids
   # ✅ Ensure MongoDB ID is used correctly
 
+def escape_markdown_v2(text):
+    """Escapes special characters in MarkdownV2 to prevent parsing errors."""
+    escape_chars = r"_*[]()~`>#+-=|{}.!"
+    return "".join(f"\\{char}" if char in escape_chars else char for char in text)
+
 async def handle_bid(update: Update, context: CallbackContext) -> None:
     """Processes user bids in the auction."""
     query = update.callback_query
@@ -140,14 +145,19 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
         {"$set": {"highest_bid": new_bid, "highest_bidder": user_id}}
     )
 
-    # ✅ Edit auction message (Use MarkdownV2)
+    # ✅ Escape auction message for MarkdownV2
+    char_name = escape_markdown_v2(auction["character"]["name"])
+    char_rarity = escape_markdown_v2(auction["character"].get("rarity", "Unknown"))
+    highest_bidder = f"@{query.from_user.username}" if query.from_user.username else f"[User](tg://user?id={user_id})"
+
+    # ✅ Edit auction message (MarkdownV2 Safe)
     auction_message = (
         f"⚔ *Auction Ongoing!*\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🎴 *Character:* `{auction['character']['name']}`\n"
-        f"🎖 *Rarity:* `{auction['character'].get('rarity', 'Unknown')}`\n"
+        f"🎴 *Character:* `{char_name}`\n"
+        f"🎖 *Rarity:* `{char_rarity}`\n"
         f"💰 *Highest Bid:* `{new_bid} CC`\n"
-        f"👤 *Highest Bidder:* @{query.from_user.username if query.from_user.username else 'Unknown'}\n"
+        f"👤 *Highest Bidder:* {highest_bidder}\n"
         f"📌 *Auction ends soon!*"
     )
 

@@ -53,14 +53,14 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
 
     # ✅ Send Auction Message in Channel
     auction_message = (
-        f"🏆 **Auction Started!**\n"
+        f"🏆 Auction Started!\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🎴 **Character:** {character['name']}\n"
-        f"🎖 **Rarity:** {character.get('rarity', 'Unknown')}\n"
-        f"💰 **Starting Bid:** {starting_bid} CC\n"
-        f"📌 **Duration:** 10 minutes\n"
+        f"🎴 Character: {character['name']}\n"
+        f"🎖 Rarity: {character.get('rarity', 'Unknown')}\n"
+        f"💰 Starting Bid: {starting_bid} CC\n"
+        f"📌 Duration: 10 minutes\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📢 **Bid using the buttons below!**"
+        f"📢 Bid using the buttons below!"
     )
 
     keyboard = [
@@ -138,13 +138,13 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
 
     # ✅ Update Auction Message
     auction_message = (
-        f"🏆 **Auction Update**\n"
+        f"🏆 Auction Update\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🎴 **Character:** {auction['character']['name']}\n"
-        f"🎖 **Rarity:** {auction['character'].get('rarity', 'Unknown')}\n"
-        f"💰 **Highest Bid:** {new_bid} CC\n"
-        f"👤 **Highest Bidder:** @{query.from_user.username if query.from_user.username else 'Unknown'}\n"
-        f"📌 **Auction ends soon!**"
+        f"🎴 Character: {auction['character']['name']}\n"
+        f"🎖 Rarity: {auction['character'].get('rarity', 'Unknown')}\n"
+        f"💰 Highest Bid: {new_bid} CC\n"
+        f"👤 Highest Bidder: @{query.from_user.username if query.from_user.username else 'Unknown'}\n"
+        f"📌 Auction ends soon!"
     )
 
     keyboard = [
@@ -186,11 +186,11 @@ async def end_auction(auction_id, context: CallbackContext) -> None:
         )
 
         auction_message = (
-            f"🏆 **Auction Ended!**\n"
-            f"🎴 **Winner:** <a href='tg://user?id={highest_bidder}'>User {highest_bidder}</a>\n"
-            f"💰 **Winning Bid:** {highest_bid} CC\n"
-            f"🎖 **Character:** {character['name']}\n"
-            f"📌 **Congratulations to the winner!**"
+            f"🏆 Auction Ended!\n"
+            f"🎴 Winner: <a href='tg://user?id={highest_bidder}'>User {highest_bidder}</a>\n"
+            f"💰 Winning Bid: {highest_bid} CC\n"
+            f"🎖 Character: {character['name']}\n"
+            f"📌 Congratulations to the winner!"
         )
 
     await context.bot.edit_message_caption(

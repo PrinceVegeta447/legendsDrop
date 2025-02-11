@@ -31,7 +31,7 @@ BOT_USERNAME = Config.BOT_USERNAME
 sudo_users = Config.sudo_users
 OWNER_ID = Config.OWNER_ID 
 
-application = Application.builder().token(TOKEN).build()
+application = Application.builder().token(TOKEN).concurrent_updates(True).build()
 shivuu = Client("Shivu", api_id, api_hash, bot_token=TOKEN)
 lol = AsyncIOMotorClient(mongo_url, tls=True, tlsAllowInvalidCertificates=True)
 db = lol['Character_catcher']

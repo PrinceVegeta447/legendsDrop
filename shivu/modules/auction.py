@@ -151,10 +151,9 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
 
     await query.answer(f"✅ You bid {new_bid} CC!")
 
-# ✅ End Auction
 async def end_auction(auction_id, context: CallbackContext) -> None:
     """Ends the auction and gives the character to the highest bidder."""
-    auction = await auction_collection.find_one({"_id": ObjectId(auction_id)})
+    auction = await auction_collection.find_one({"_id": auction_id})
     if not auction or auction["status"] != "ongoing":
         return
 
@@ -163,17 +162,40 @@ async def end_auction(auction_id, context: CallbackContext) -> None:
     character = auction["character"]
 
     # ✅ Update auction status
-    await auction_collection.update_one({"_id": ObjectId(auction_id)}, {"$set": {"status": "ended"}})
+    await auction_collection.update_one({"_id": auction_id}, {"$set": {"status": "ended"}})
 
-    auction_message = f"❌ **Auction Ended! No bids were placed.**" if not highest_bidder else (
-        f"🏆 **Auction Ended!**\n"
-        f"🎴 **Winner:** <a href='tg://user?id={highest_bidder}'>User {highest_bidder}</a>\n"
-        f"💰 **Winning Bid:** {highest_bid} CC\n"
-        f"🎖 **Character:** {character['name']}\n"
-        f"📌 **Congratulations to the winner!**"
+    if not highest_bidder:
+        auction_message = "❌ **Auction Ended! No bids were placed.**"
+    else:
+        # ✅ Deduct CC from winner
+        result = await user_collection.update_one(
+            {"id": highest_bidder, "chrono_crystals": {"$gte": highest_bid}},  # Ensure enough CC
+            {"$inc": {"chrono_crystals": -highest_bid}, "$push": {"characters": character}}
+        )
+
+        if result.modified_count > 0:
+            auction_message = (
+                f"🏆 **Auction Ended!**\n"
+                f"🎴 **Winner:** <a href='tg://user?id={highest_bidder}'>User {highest_bidder}</a>\n"
+                f"💰 **Winning Bid:** {highest_bid} CC\n"
+                f"🎖 **Character:** {character['name']}\n"
+                f"📌 **Congratulations to the winner!**"
+            )
+        else:
+            auction_message = (
+                f"⚠ **Auction Ended, but there was an issue deducting CC!**\n"
+                f"🆔 Winner: <a href='tg://user?id={highest_bidder}'>User {highest_bidder}</a>\n"
+                f"💰 Winning Bid: {highest_bid} CC\n"
+                f"❗ Please check their CC balance manually!"
+            )
+
+    # ✅ Update auction message
+    await context.bot.edit_message_caption(
+        chat_id=auction["channel_id"],
+        message_id=auction["message_id"],
+        caption=auction_message,
+        parse_mode="HTML"
     )
-
-    await context.bot.edit_message_caption(chat_id=auction["channel_id"], message_id=auction["message_id"], caption=auction_message, parse_mode="HTML")
 
 # ✅ Register Handlers
 application.add_handler(CommandHandler("auction", start_auction, block=False))

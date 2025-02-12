@@ -29,10 +29,10 @@ async def trade(client, message):
     sender = await user_collection.find_one({'id': sender_id})
     receiver = await user_collection.find_one({'id': receiver_id})
 
-    if not sender or 'characters' not in sender:
+    if not sender or not sender.get('characters'):
         await message.reply_text("❌ **You don't have any characters to trade!**")
         return
-    if not receiver or 'characters' not in receiver:
+    if not receiver or not receiver.get('characters'):
         await message.reply_text("❌ **The other user doesn't have any characters to trade!**")
         return
 
@@ -88,7 +88,7 @@ async def trade_callback(client, callback_query):
             await callback_query.message.edit_text("❌ **Trade Failed: One or both characters no longer exist!**")
             return
 
-        # Swap characters
+        # ✅ Swap one instance of the character
         sender['characters'].remove(sender_character)
         receiver['characters'].remove(receiver_character)
         sender['characters'].append(receiver_character)
@@ -128,7 +128,7 @@ async def gift(client, message):
     character_id = message.command[1]
     sender = await user_collection.find_one({'id': sender_id})
 
-    if not sender or 'characters' not in sender:
+    if not sender or not sender.get('characters'):
         await message.reply_text("❌ **You have no characters to gift!**")
         return
 

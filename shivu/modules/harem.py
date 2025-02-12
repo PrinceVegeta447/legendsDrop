@@ -29,14 +29,17 @@ async def fetch_character_data(char_id):
     character = await collection.find_one({"id": char_id})
     return character.get("category", "Unknown") if character else "Unknown"
 
-async def harem(update: Update, context: CallbackContext, page=0) -> None:
+async def harem(update: Update, context: CallbackContext, page=0, query=None) -> None:
     """Displays user's character collection with improved UI."""
     user_id = update.effective_user.id
     user = await user_collection.find_one({'id': user_id})
 
     if not user or not user.get("characters"):
         message = "❌ <b>You don't have any characters in your collection yet!</b>"
-        await update.message.reply_text(message, parse_mode="HTML")
+        if query:
+            await query.answer(message, show_alert=True)
+        else:
+            await update.message.reply_text(message, parse_mode="HTML")
         return
 
     # ✅ Fetch sorting preference (Default: Category)
@@ -54,7 +57,7 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
     # ✅ Grouping characters based on sort type
     character_counts = {k: len(list(v)) for k, v in groupby(characters, key=lambda x: x["id"])}
     unique_characters = list({character['id']: character for character in characters}.values())
-    total_pages = max(1, math.ceil(len(unique_characters) / 15))
+    total_pages = max(1, math.ceil(len(unique_characters) / 10))
     page = max(0, min(page, total_pages - 1))
 
     # ✅ Improved UI
@@ -64,7 +67,7 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
         "━━━━━━━━━━━━━━━━━━━━\n"
     )
 
-    current_characters = unique_characters[page * 15 : (page + 1) * 15]
+    current_characters = unique_characters[page * 10 : (page + 1) * 10]
     grouped_characters = {k: list(v) for k, v in groupby(current_characters, key=lambda x: x.get(sort_by, "Unknown"))}
 
     for category, characters in grouped_characters.items():
@@ -96,10 +99,16 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
 
     # ✅ Display Favorite Character if Available
     fav_character = next((c for c in user["characters"] if c["id"] == user.get("favorites", [None])[0]), None)
-    if fav_character and "file_id" in fav_character:
-        await update.message.reply_photo(photo=fav_character["file_id"], caption=harem_message, reply_markup=reply_markup, parse_mode="HTML")
+    
+    if query:
+        message = query.message
     else:
-        await update.message.reply_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
+        message = update.message
+
+    if fav_character and "file_id" in fav_character:
+        await message.reply_photo(photo=fav_character["file_id"], caption=harem_message, reply_markup=reply_markup, parse_mode="HTML")
+    else:
+        await message.reply_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
 
 async def harem_callback(update: Update, context: CallbackContext) -> None:
     """Handles pagination for the /harem command."""
@@ -112,7 +121,8 @@ async def harem_callback(update: Update, context: CallbackContext) -> None:
         await query.answer("❌ This is not your collection!", show_alert=True)
         return
 
-    await harem(update, context, page)
+    await harem(update, context, page, query)
+    await query.answer()
 
 async def sort_collection(update: Update, context: CallbackContext) -> None:
     """Allows users to choose sorting method."""

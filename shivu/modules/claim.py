@@ -7,7 +7,7 @@ from shivu import application, user_collection, collection
 
 # 📌 Claim Limits
 MAX_CLAIMS = 1  # Users can claim once per day
-COOLDOWN_TIME = 24 * 60 * 60  # 24 hours cooldown
+COOLDOWN_TIME = 24 * 60 * 60  # 24 hours cooldown (86400 seconds)
 GIF_FILE_ID = "BQACAgUAAyEFAASS4tX2AAID1mepm3uPxHquFb9fbSrmnbKjhGqYAAK3FAAC1ftIVUrVTH-TVNlXNgQ"
 
 async def claim(update: Update, context: CallbackContext) -> None:
@@ -34,16 +34,18 @@ async def claim(update: Update, context: CallbackContext) -> None:
     last_claim = user.get("last_claim", 0)
     current_time = time.time()
 
+    # ✅ **Check if claim should reset**
+    if current_time - last_claim >= COOLDOWN_TIME:
+        claims = 0  # Reset claims after 24 hours
+
     # ✅ **Check Claim Limits**
     if claims >= MAX_CLAIMS:
-        await update.message.reply_text("❌ You have already claimed today. Try again tomorrow!")
-        return
-
-    cooldown_remaining = COOLDOWN_TIME - (current_time - last_claim)
-    if cooldown_remaining > 0:
-        hours = int(cooldown_remaining // 3600)
-        minutes = int((cooldown_remaining % 3600) // 60)
-        await update.message.reply_text(f"⏳ You must wait {hours}h {minutes}m before claiming again!")
+        remaining_time = COOLDOWN_TIME - (current_time - last_claim)
+        hours = int(remaining_time // 3600)
+        minutes = int((remaining_time % 3600) // 60)
+        await update.message.reply_text(
+            f"⏳ You must wait {hours}h {minutes}m before claiming again!"
+        )
         return
 
     # ✅ Fetch a random character from the database
@@ -52,7 +54,14 @@ async def claim(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ No characters available to claim!")
         return
 
-    random_character = await collection.find_one({}, skip=random.randint(0, total_characters - 1))
+    pipeline = [{"$sample": {"size": 1}}]  # MongoDB's efficient random selection
+    random_character = await collection.aggregate(pipeline).to_list(length=1)
+
+    if not random_character:
+        await update.message.reply_text("❌ Failed to claim a character. Try again!")
+        return
+
+    random_character = random_character[0]  # Extract character data
 
     # ✅ Send GIF animation
     gif_message = await update.message.reply_animation(animation=GIF_FILE_ID, caption="✨ Claiming a character...")
@@ -73,6 +82,7 @@ async def claim(update: Update, context: CallbackContext) -> None:
     # ✅ Prepare Character Message
     char_name = random_character["name"]
     char_rarity = random_character.get("rarity", "Unknown")
+    char_category = random_character.get("category", "Unknown")
     char_file_id = random_character.get("file_id")
     char_img_url = random_character.get("img_url")
 
@@ -80,6 +90,7 @@ async def claim(update: Update, context: CallbackContext) -> None:
         f"🎉 <b>You have claimed:</b>\n"
         f"🎴 <b>{char_name}</b>\n"
         f"🎖 <b>Rarity:</b> {char_rarity}\n"
+        f"📛 <b>Category:</b> {char_category}\n"
         "🔹 Use `/collection` to view your collection!"
     )
 

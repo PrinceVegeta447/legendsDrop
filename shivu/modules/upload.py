@@ -205,7 +205,7 @@ async def delete(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text(f"❌ Error deleting character: {str(e)}")
 
 # ✅ Function to update character details
-async def update(update: Update, context: CallbackContext) -> None:
+ async def update(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
     if user_id not in sudo_users and user_id != OWNER_ID:
@@ -214,37 +214,37 @@ async def update(update: Update, context: CallbackContext) -> None:
 
     try:
         args = context.args
-        if len(args) != 3:
+        if len(args) < 3:
             await update.message.reply_text("❌ Incorrect format! Use: `/update <ID> <field> <new_value>`")
             return
 
-        character = await collection.find_one({'id': args[0]})
+        character_id = args[0]
+        field_to_update = args[1]
+        new_value = " ".join(args[2:])  # ✅ This joins multi-word values
+
+        character = await collection.find_one({'id': character_id})
         if not character:
             await update.message.reply_text("❌ Character not found.")
             return
 
         valid_fields = ["file_id", "name", "rarity", "category"]
-        if args[1] not in valid_fields:
+        if field_to_update not in valid_fields:
             await update.message.reply_text(f"❌ Invalid field! Use one of: {', '.join(valid_fields)}")
             return
 
-        # ✅ Handle rarity update
-        if args[1] == "rarity":
-            if args[2] not in rarity_map:
-                await update.message.reply_text("❌ Invalid rarity. Use 1-9.")
-                return
-            new_value = rarity_map[args[2]]
-        else:
-            new_value = args[2]
+        if field_to_update == "rarity" and new_value not in rarity_map:
+            await update.message.reply_text("❌ Invalid rarity. Use 1-9.")
+            return
+        if field_to_update == "rarity":
+            new_value = rarity_map[new_value]  # Convert number to rarity name
 
         # ✅ Update the database
-        await collection.find_one_and_update({'id': args[0]}, {'$set': {args[1]: new_value}})
+        await collection.find_one_and_update({'id': character_id}, {'$set': {field_to_update: new_value}})
 
-        await update.message.reply_text(f"✅ Character `{args[0]}` updated successfully!")
+        await update.message.reply_text(f"✅ Character `{character_id}` updated successfully!")
 
     except Exception as e:
-        await update.message.reply_text("❌ Update failed! Make sure the bot has channel permissions.")
-
+        await update.message.reply_text(f"❌ Update failed! Error: {str(e)}")
 # ✅ Add command handlers
 application.add_handler(CommandHandler("upload", upload, block=False))
 application.add_handler(CommandHandler("delete", delete, block=False))

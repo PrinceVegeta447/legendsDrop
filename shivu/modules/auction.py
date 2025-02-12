@@ -59,29 +59,28 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
     auction_doc = await auction_collection.insert_one(auction_data)
 
     # ✅ Send Auction Message in Channel
-    auction_message = (
-        f"⚔ <b>Auction Started!</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🎴 <b>Character:</b> {character['name']}\n"
-        f"🎖 <b>Rarity:</b> {character.get('rarity', 'Unknown')}\n"
-        f"💰 <b>Starting Bid:</b> {starting_bid} CC\n"
-        f"👤 <b>Highest Bidder:</b> {auction_data['highest_bidder_name']}\n"
-        f"📌 <b>Duration:</b> 10 minutes\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📢 <b>Bid using the buttons below!</b>"
-    )
-
     keyboard = [
         [InlineKeyboardButton("💎 Bid +200 CC", callback_data=f"bid:{auction_doc.inserted_id}:200")],
         [InlineKeyboardButton("💰 Bid +500 CC", callback_data=f"bid:{auction_doc.inserted_id}:500")]
     ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
     message = await context.bot.send_photo(
         chat_id=channel_id,
         photo=character.get("file_id", None) or character.get("img_url", None),
-        caption=auction_message,
+        caption=(
+            f"⚔ 𝘼𝙪𝙘𝙩𝙞𝙤𝙣 𝙎𝙩𝙖𝙧𝙩𝙚𝙙!\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎴 𝘾𝙝𝙖𝙧𝙖𝙘𝙩𝙚𝙧: {character['name']}\n"
+            f"🎖 𝙍𝙖𝙧𝙞𝙩𝙮: {character.get('rarity', 'Unknown')}\n"
+            f"💰 𝙎𝙩𝙖𝙧𝙩𝙞𝙣𝙜 𝘽𝙞𝙙: {starting_bid} CC\n"
+            f"👤 𝙃𝙞𝙜𝙝𝙚𝙨𝙩 𝘽𝙞𝙙𝙙𝙚𝙧: {auction_data['highest_bidder_name']}\n"
+            f"📌 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣: 10 minutes\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📢 𝘽𝙞𝙙 𝙪𝙨𝙞𝙣𝙜 𝙩𝙝𝙚 𝙗𝙪𝙩𝙩𝙤𝙣𝙨 𝙗𝙚𝙡𝙤𝙬!"
+        ),
         parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=reply_markup
     )
 
     # ✅ Store message ID for auction tracking
@@ -95,6 +94,7 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
     # ✅ Schedule auction ending
     await asyncio.sleep(AUCTION_DURATION)
     await end_auction(auction_doc.inserted_id, context)
+
 
 async def handle_bid(update: Update, context: CallbackContext) -> None:
     """Processes user bids in the auction."""
@@ -137,27 +137,31 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
         {"$set": {"highest_bid": new_bid, "highest_bidder": user_id, "highest_bidder_name": user_first_name}}
     )
 
-    # ✅ Update auction message in real-time
-    auction_message = (
-        f"⚔ <b>Auction Ongoing!</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🎴 <b>Character:</b> {auction['character']['name']}\n"
-        f"🎖 <b>Rarity:</b> {auction['character'].get('rarity', 'Unknown')}\n"
-        f"💰 <b>Highest Bid:</b> {new_bid} CC\n"
-        f"👤 <b>Highest Bidder:</b> {user_first_name}\n"
-        f"📌 <b>Time Remaining:</b> Auction Ending Soon!\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📢 <b>Bid using the buttons below!</b>"
-    )
+    # ✅ Edit auction message without losing inline buttons
+    keyboard = [
+        [InlineKeyboardButton("💎 Bid +200 CC", callback_data=f"bid:{auction_id}:200")],
+        [InlineKeyboardButton("💰 Bid +500 CC", callback_data=f"bid:{auction_id}:500")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await context.bot.edit_message_caption(
-        chat_id=auction["channel_id"],
-        message_id=auction["message_id"],
-        caption=auction_message,
-        parse_mode="HTML"
+    await query.message.edit_caption(
+        caption=(
+            f"⚔ 𝗔𝘂𝗰𝘁𝗶𝗼𝗻 𝗢𝗻𝗴𝗼𝗶𝗻𝗴!\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎴 <b>Character:</b> {auction['character']['name']}\n"
+            f"🎖 <b>Rarity:</b> {auction['character'].get('rarity', 'Unknown')}\n"
+            f"💰 <b>Highest Bid:</b> {new_bid} CC\n"
+            f"👤 <b>Highest Bidder:</b> {user_first_name}\n"
+            f"📌 <b>Auction Ending Soon!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📢 <b>Bid using the buttons below!</b>"
+        ),
+        parse_mode="HTML",
+        reply_markup=reply_markup
     )
 
     await query.answer(f"✅ You bid {new_bid} CC!")
+
 
 async def end_auction(auction_id, context: CallbackContext) -> None:
     """Ends the auction and gives the character to the highest bidder."""

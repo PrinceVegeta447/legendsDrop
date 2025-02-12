@@ -117,7 +117,7 @@ async def generate_harem_message(user, page):
             rarity_icon = RARITY_ICONS.get(character["rarity"], "🔹")
             
             # Display character name with ID in brackets
-            harem_message += f"{rarity_icon} <b>{character['name']} ×{count}\n" [{character['id']}]</b>
+            harem_message += f"{rarity_icon} <b>{character['name']} ×{count} [{character['id']}]</b>\n"
 
     total_count = len(user['characters'])
     keyboard = [

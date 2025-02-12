@@ -20,7 +20,8 @@ CATEGORY_ICONS = {
 
 RARITY_ICONS = {
     "⚪ Common": "⚪", "🟢 Uncommon": "🟢", "🔵 Rare": "🔵",
-    "🟣 Extreme": "🟣", "🟡 Sparking": "🟡", "🔱 Ultra": "🔱"
+    "🟣 Extreme": "🟣", "🟡 Sparking": "🟡", "🔱 Ultra": "🔱",
+    "💠 Legends Limited": "💠", "🔮 Zenkai": "🔮", "🏆 Event-Exclusive": "🏆"
 }
 
 async def fetch_character_data(char_id):

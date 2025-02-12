@@ -217,31 +217,42 @@ async def delete(update: Update, context: CallbackContext) -> None:
         if len(args) < 3:
             await update.message.reply_text("❌ Incorrect format! Use: `/update <ID> <field> <new_value>`")
             return
-
-        character_id = args[0]
-        field_to_update = args[1]
-        new_value = " ".join(args[2:])  # ✅ This joins multi-word values
-
-        character = await collection.find_one({'id': character_id})
-        if not character:
-            await update.message.reply_text("❌ Character not found.")
-            return
+        
+        character_id, field, new_value = args[0], args[1], ' '.join(args[2:])
 
         valid_fields = ["file_id", "name", "rarity", "category"]
-        if field_to_update not in valid_fields:
+        if field not in valid_fields:
             await update.message.reply_text(f"❌ Invalid field! Use one of: {', '.join(valid_fields)}")
             return
+        
+        # Handle rarity separately
+        rarity_map = {
+            "1": "⚪ Common",
+            "2": "🟢 Uncommon",
+            "3": "🔵 Rare",
+            "4": "🟣 Extreme",
+            "5": "🟡 Sparking",
+            "6": "🔱 Ultra",
+            "7": "💠 Legends Limited",
+            "8": "🔮 Zenkai",
+            "9": "🏆 Event-Exclusive"
+        }
 
-        if field_to_update == "rarity" and new_value not in rarity_map:
-            await update.message.reply_text("❌ Invalid rarity. Use 1-9.")
-            return
-        if field_to_update == "rarity":
-            new_value = rarity_map[new_value]  # Convert number to rarity name
+        if field == "rarity":
+            if new_value not in rarity_map:
+                await update.message.reply_text("❌ Invalid rarity. Use numbers 1-9.")
+                return
+            new_value = rarity_map[new_value]
 
-        # ✅ Update the database
-        await collection.find_one_and_update({'id': character_id}, {'$set': {field_to_update: new_value}})
+        # Update character in database
+        result = await collection.find_one_and_update(
+            {'id': character_id}, {'$set': {field: new_value}}
+        )
 
-        await update.message.reply_text(f"✅ Character `{character_id}` updated successfully!")
+        if result:
+            await update.message.reply_text(f"✅ Character `{character_id}` updated successfully!")
+        else:
+            await update.message.reply_text("❌ Character not found.")
 
     except Exception as e:
         await update.message.reply_text(f"❌ Update failed! Error: {str(e)}")

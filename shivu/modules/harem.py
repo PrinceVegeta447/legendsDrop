@@ -71,7 +71,7 @@ async def harem(update: Update, context: CallbackContext, page=0, query=None) ->
     grouped_characters = {k: list(v) for k, v in groupby(current_characters, key=lambda x: x.get(sort_by, "Unknown"))}
 
     for category, characters in grouped_characters.items():
-        icon = CATEGORY_ICONS.get(category, "📦")  # Default if category icon is missing
+        icon = CATEGORY_ICONS.get(category, "⛩️")  # Default if category icon is missing
         category_count = await collection.count_documents({"category": category})
         harem_message += f"\n{icon} <b>{category}</b> ({len(characters)}/{category_count})\n"
 

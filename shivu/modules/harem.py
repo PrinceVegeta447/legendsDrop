@@ -153,5 +153,5 @@ async def sort_callback(update: Update, context: CallbackContext) -> None:
 # ✅ Register Handlers
 application.add_handler(CommandHandler(["harem", "collection"], harem, block=False))
 application.add_handler(CallbackQueryHandler(harem_callback, pattern="^harem", block=False))
-application.add_handler(CommandHandler("sort", sort_collection, block=False))
+application.add_handler(CommandHandler("sort", user_collection, block=False))
 application.add_handler(CallbackQueryHandler(sort_callback, pattern="^sort:", block=False))

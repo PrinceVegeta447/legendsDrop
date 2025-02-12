@@ -2,41 +2,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
 from shivu import application, collection, user_collection
 
-# ✅ Updated Rarity Icons
-RARITY_ICONS = {
-    1: "⚪ Common",
-    2: "🟢 Uncommon",
-    3: "🔵 Rare",
-    4: "🟣 Extreme",
-    5: "🟡 Sparking",
-    6: "🔱 Ultra",
-    7: "💠 Legends Limited",
-    8: "🔮 Zenkai",
-    9: "🏆 Event-Exclusive"
-}
-
-# ✅ Updated Category Icons
-CATEGORY_ICONS = {
-    1: "🏆 Saiyan",
-    2: "🔥 Hybrid Saiyan",
-    3: "🤖 Android",
-    4: "❄️ Frieza Force",
-    5: "✨ God Ki",
-    6: "💪 Super Warrior",
-    7: "🩸 Regeneration",
-    8: "🔀 Fusion Warrior",
-    9: "🤝 Duo",
-   10: "🔱 Super Saiyan God SS",
-   11: "🗿 Ultra Instinct Sign",
-   12: "⚡ Super Saiyan",
-   13: "❤️‍🔥 Dragon Ball Saga",
-   14: "💫 Majin Buu Saga",
-   15: "👾 Cell Saga",
-   16: "📽️ Sagas From the Movies",
-   17: "☠️ Lineage Of Evil",
-   18: "🌏 Universe Survival Saga"
-}
-
 async def check_character(update: Update, context: CallbackContext) -> None:
     """Displays character details and collector buttons."""
     if len(context.args) != 1:
@@ -52,11 +17,8 @@ async def check_character(update: Update, context: CallbackContext) -> None:
 
     # ✅ Extract Character Details
     name = character["name"]
-    rarity = character.get("rarity", 0)  # Default to 0 if missing
-    category = character.get("category", 0)
-
-    rarity_text = RARITY_ICONS.get(int(rarity), "❓ Unknown Rarity")
-    category_text = CATEGORY_ICONS.get(int(category), "❓ Unknown Category")
+    rarity_text = character.get("rarity", "❓ Unknown Rarity")  # Now uses stored values directly
+    category_text = character.get("category", "❓ Unknown Category")
 
     message = (
         f"🎴 <b>Character:</b> {name}\n"
@@ -71,7 +33,7 @@ async def check_character(update: Update, context: CallbackContext) -> None:
     ]
 
     await update.message.reply_photo(
-        photo=character.get("file_id", None) or character.get("img_url", None),
+        photo=character.get("file_id", None),
         caption=message,
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(keyboard)
@@ -83,10 +45,10 @@ async def show_top_collectors(update: Update, context: CallbackContext) -> None:
     _, character_id = query.data.split(":")
 
     pipeline = [
-        {"$match": {"characters.id": character_id}},
-        {"$unwind": "$characters"},
-        {"$match": {"characters.id": character_id}},
-        {"$group": {"_id": "$user_id", "count": {"$sum": 1}, "first_name": {"$first": "$first_name"}}},
+        {"$match": {"characters.id": character_id}},  # Match users who own this character
+        {"$unwind": "$characters"},  # Flatten characters array
+        {"$match": {"characters.id": character_id}},  # Ensure only matching character is counted
+        {"$group": {"_id": "$id", "count": {"$sum": 1}, "first_name": {"$first": "$first_name"}}},
         {"$sort": {"count": -1}},
         {"$limit": 5}
     ]
@@ -101,7 +63,7 @@ async def show_top_collectors(update: Update, context: CallbackContext) -> None:
     for i, user in enumerate(collectors, 1):
         message += f"{i}. {user['first_name']} - {user['count']} times\n"
 
-    await query.message.reply_text(message, parse_mode="Markdown")
+    await query.message.edit_text(message, parse_mode="Markdown")
 
 async def show_local_collectors(update: Update, context: CallbackContext) -> None:
     """Displays collectors of a specific character in the current group."""
@@ -110,10 +72,11 @@ async def show_local_collectors(update: Update, context: CallbackContext) -> Non
     group_id = query.message.chat.id
 
     pipeline = [
-        {"$match": {"characters.id": character_id, "groups": group_id}},
-        {"$unwind": "$characters"},
-        {"$match": {"characters.id": character_id}},
-        {"$group": {"_id": "$user_id", "count": {"$sum": 1}, "first_name": {"$first": "$first_name"}}},
+        {"$match": {"characters.id": character_id}},  # Match users who own this character
+        {"$unwind": "$characters"},  # Flatten characters array
+        {"$match": {"characters.id": character_id}},  # Ensure only matching character is counted
+        {"$match": {"groups": group_id}},  # Filter only users in this group
+        {"$group": {"_id": "$id", "count": {"$sum": 1}, "first_name": {"$first": "$first_name"}}},
         {"$sort": {"count": -1}},
         {"$limit": 5}
     ]
@@ -128,7 +91,7 @@ async def show_local_collectors(update: Update, context: CallbackContext) -> Non
     for i, user in enumerate(collectors, 1):
         message += f"{i}. {user['first_name']} - {user['count']} times\n"
 
-    await query.message.reply_text(message, parse_mode="Markdown")
+    await query.message.edit_text(message, parse_mode="Markdown")
 
 # ✅ Register Handlers
 application.add_handler(CommandHandler("check", check_character, block=False))

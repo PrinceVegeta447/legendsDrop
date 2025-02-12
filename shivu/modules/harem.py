@@ -83,7 +83,6 @@ async def harem_callback(update: Update, context: CallbackContext) -> None:
 
     await query.answer()
 
-
 async def generate_harem_message(user, page):
     """Generates harem message and inline keyboard for pagination."""
     user_id = user['id']
@@ -109,12 +108,16 @@ async def generate_harem_message(user, page):
     for category, characters in grouped_characters.items():
         icon = CATEGORY_ICONS.get(category, "⛩️")
         category_count = await collection.count_documents({"category": category})
-        harem_message += f"\n{icon} <b>{category}</b> ({len(characters)}/{category_count})\n"
+
+        # Add category header with a line break before characters
+        harem_message += f"\n{icon} <b>{category}</b> ({len(characters)}/{category_count})\n\n"
 
         for character in characters:
             count = character_counts[character["id"]]
             rarity_icon = RARITY_ICONS.get(character["rarity"], "🔹")
-            harem_message += f"{rarity_icon} <b>{character['name']}</b> ×{count}\n"
+            
+            # Display character name with ID in brackets
+            harem_message += f"{rarity_icon} <b>{character['name']} ×{count}\n" [{character['id']}]</b>
 
     total_count = len(user['characters'])
     keyboard = [
@@ -135,15 +138,6 @@ async def generate_harem_message(user, page):
     fav_character = next((c for c in user["characters"] if c["id"] == user.get("favorites", [None])[0]), None)
 
     return harem_message, reply_markup, fav_character
-
-async def sort_collection(update: Update, context: CallbackContext) -> None:
-    """Allows users to choose sorting method."""
-    keyboard = [
-        [InlineKeyboardButton("📌 Sort by Rarity", callback_data="sort:rarity")],
-        [InlineKeyboardButton("📂 Sort by Category", callback_data="sort:category")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("🔀 Choose how you want to sort your collection:", reply_markup=reply_markup)
 
 async def sort_callback(update: Update, context: CallbackContext) -> None:
     """Handles sorting preference and saves it in the database."""

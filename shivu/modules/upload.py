@@ -205,7 +205,7 @@ async def delete(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text(f"❌ Error deleting character: {str(e)}")
 
 # ✅ Function to update character details
- async def update(update: Update, context: CallbackContext) -> None:
+async def update(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
     if user_id not in sudo_users and user_id != OWNER_ID:

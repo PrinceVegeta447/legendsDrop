@@ -5,7 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
 from shivu import application, user_collection, collection, OWNER_ID, auction_collection
 
-# ✅ Auction Duration (Seconds)
+# ✅ Auction Duration & Settings
 AUCTION_DURATION = 600  # 10 minutes
 MIN_BID_INCREMENT = 200  # Minimum bid increment in CC
 
@@ -52,6 +52,7 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
         "highest_bidder": None,
         "end_time": time.time() + AUCTION_DURATION,
         "channel_id": channel_id,
+        "message_id": None,
         "status": "ongoing"
     }
     auction_doc = await auction_collection.insert_one(auction_data)
@@ -133,35 +134,11 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
         {"$set": {"highest_bid": new_bid, "highest_bidder": user_id}}
     )
 
-    # ✅ Edit auction message
-    auction_message = (
-        f"⚔ <b>Auction Ongoing!</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🎴 <b>Character:</b> {auction['character']['name']}\n"
-        f"🎖 <b>Rarity:</b> {auction['character'].get('rarity', 'Unknown')}\n"
-        f"💰 <b>Highest Bid:</b> {new_bid} CC\n"
-        f"👤 <b>Highest Bidder:</b> @{query.from_user.username if query.from_user.username else 'Unknown'}\n"
-        f"📌 <b>Auction ends soon!</b>"
-    )
-
-    keyboard = [
-        [InlineKeyboardButton("💎 Bid +200 CC", callback_data=f"bid:{auction_id}:200")],
-        [InlineKeyboardButton("💰 Bid +500 CC", callback_data=f"bid:{auction_id}:500")]
-    ]
-
-    await context.bot.edit_message_caption(
-        chat_id=auction["channel_id"],
-        message_id=auction["message_id"],
-        caption=auction_message,
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
     await query.answer(f"✅ You bid {new_bid} CC!")
 
 async def end_auction(auction_id, context: CallbackContext) -> None:
     """Ends the auction and gives the character to the highest bidder."""
-    auction = await auction_collection.find_one({"_id": auction_id})
+    auction = await auction_collection.find_one({"_id": ObjectId(auction_id)})
     if not auction or auction["status"] != "ongoing":
         return
 
@@ -170,11 +147,17 @@ async def end_auction(auction_id, context: CallbackContext) -> None:
     character = auction["character"]
 
     # ✅ Update auction status
-    await auction_collection.update_one({"_id": auction_id}, {"$set": {"status": "ended"}})
+    await auction_collection.update_one({"_id": ObjectId(auction_id)}, {"$set": {"status": "ended"}})
 
     if not highest_bidder:
         auction_message = "❌ **Auction Ended! No bids were placed.**"
     else:
+        # ✅ Deduct CC & Add Character
+        await user_collection.update_one(
+            {"id": highest_bidder},
+            {"$inc": {"chrono_crystals": -highest_bid}, "$push": {"characters": character}}
+        )
+
         auction_message = (
             f"🏆 **Auction Ended!**\n"
             f"🎴 **Winner:** <a href='tg://user?id={highest_bidder}'>User {highest_bidder}</a>\n"
@@ -183,6 +166,22 @@ async def end_auction(auction_id, context: CallbackContext) -> None:
             f"📌 **Congratulations to the winner!**"
         )
 
+        # ✅ **Notify Winner via DM**
+        try:
+            await context.bot.send_message(
+                chat_id=highest_bidder,
+                text=(
+                    f"🏆 **Congratulations!** 🎉\n\n"
+                    f"You have won the auction for:\n"
+                    f"🎴 **Character:** {character['name']}\n"
+                    f"💰 **Winning Bid:** {highest_bid} CC\n\n"
+                    f"The character has been added to your collection! 🏆"
+                ),
+                parse_mode="HTML"
+            )
+        except Exception:
+            print(f"⚠️ Could not send DM to user {highest_bidder} (Maybe they disabled DMs).")
+
     await context.bot.edit_message_caption(
         chat_id=auction["channel_id"],
         message_id=auction["message_id"],
@@ -190,5 +189,6 @@ async def end_auction(auction_id, context: CallbackContext) -> None:
         parse_mode="HTML"
     )
 
+# ✅ Register Handlers
 application.add_handler(CommandHandler("auction", start_auction, block=False))
 application.add_handler(CallbackQueryHandler(handle_bid, pattern="^bid:", block=False))

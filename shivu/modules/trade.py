@@ -152,6 +152,7 @@ async def gift(client, message):
         reply_markup=keyboard
     )
 
+
 @shivuu.on_callback_query(filters.regex(r"^(confirm_gift|cancel_gift):(\d+):(\d+)$"))
 async def gift_callback(client, callback_query):
     action, sender_id, receiver_id = callback_query.data.split(":")
@@ -161,11 +162,22 @@ async def gift_callback(client, callback_query):
         await callback_query.answer("⚠️ This gift request is no longer active!", show_alert=True)
         return
 
+    sender = await user_collection.find_one({'id': sender_id})
+    receiver = await user_collection.find_one({'id': receiver_id})
+
+    if not sender or not receiver:
+        await callback_query.message.edit_text("❌ **Gift Failed: One or both users no longer exist!**")
+        return
+
     character = pending_gifts.pop((sender_id, receiver_id))
 
     if action == "confirm_gift":
-        await user_collection.update_one({'id': sender_id}, {'$pull': {'characters': {'id': character['id']}}})
-        await user_collection.update_one({'id': receiver_id}, {'$push': {'characters': character}})
+        # ✅ Remove only one instance from sender
+        sender['characters'].remove(character)
+        receiver['characters'].append(character)
+
+        await user_collection.update_one({'id': sender_id}, {'$set': {'characters': sender['characters']}})
+        await user_collection.update_one({'id': receiver_id}, {'$set': {'characters': receiver['characters']}})
 
         await callback_query.message.edit_text(f"✅ **Gift Successful!**\n🎁 **{character['name']}** has been gifted!")
     else:

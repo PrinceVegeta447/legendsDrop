@@ -172,5 +172,6 @@ application.add_handler(CommandHandler("store", exclusive_store))
 application.add_handler(CommandHandler("addstore", add_store_character))
 application.add_handler(conv_handler)
 
-# ✅ Schedule store refresh every week
-asyncio.create_task(refresh_store())
+
+loop = asyncio.get_event_loop()
+loop.create_task(refresh_store())

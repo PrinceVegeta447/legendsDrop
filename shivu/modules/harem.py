@@ -1,32 +1,41 @@
-from telegram import Update
-from itertools import groupby
-import math
-from html import escape
-import random
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from itertools import groupby
+from html import escape
+import math
+import random
 from shivu import collection, user_collection, application, db
 
 DEFAULT_SORT = "category"  # Default sorting option
 
+CATEGORY_ICONS = {
+    "🏆 Saiyan": "🏆", "🔥 Hybrid Saiyan": "🔥", "🤖 Android": "🤖",
+    "❄️ Frieza Force": "❄️", "✨ God Ki": "✨", "💪 Super Warrior": "💪",
+    "🩸 Regeneration": "🩸", "🔀 Fusion Warrior": "🔀", "🤝 Duo": "🤝",
+    "🔱 Super Saiyan God SS": "🔱", "🗿 Ultra Instinct Sign": "🗿",
+    "⚡ Super Saiyan": "⚡", "❤️‍🔥 Dragon Ball Saga": "❤️‍🔥",
+    "💫 Majin Buu Saga": "💫", "👾 Cell Saga": "👾", "📽️ Sagas From the Movies": "📽️",
+    "☠️ Lineage Of Evil": "☠️", "🌏 Universe Survival Saga": "🌏"
+}
+
+RARITY_ICONS = {
+    "⚪ Common": "⚪", "🟢 Uncommon": "🟢", "🔵 Rare": "🔵",
+    "🟣 Extreme": "🟣", "🟡 Sparking": "🟡", "🔱 Ultra": "🔱"
+}
+
 async def fetch_character_data(char_id):
-    """Fetches character details from the main collection (to ensure category exists)."""
+    """Fetch character category from the main database."""
     character = await collection.find_one({"id": char_id})
-    if character:
-        return character.get("category", "Unknown")  # ✅ Get category properly
-    return "Unknown"
+    return character.get("category", "Unknown") if character else "Unknown"
 
 async def harem(update: Update, context: CallbackContext, page=0) -> None:
-    """Displays the user's character collection sorted by category or rarity."""
+    """Displays user's character collection with improved UI."""
     user_id = update.effective_user.id
-
     user = await user_collection.find_one({'id': user_id})
+
     if not user or not user.get("characters"):
-        message = "❌ **You don't have any characters in your collection yet!**"
-        if update.message:
-            await update.message.reply_text(message)
-        else:
-            await update.callback_query.edit_message_text(message)
+        message = "❌ <b>You don't have any characters in your collection yet!</b>"
+        await update.message.reply_text(message, parse_mode="HTML")
         return
 
     # ✅ Fetch sorting preference (Default: Category)
@@ -38,27 +47,34 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
         if "category" not in character:
             character["category"] = await fetch_character_data(character["id"])
 
-    # ✅ Sorting logic (Default: Category, Alternative: Rarity)
+    # ✅ Sorting logic (Category → Default, Rarity → Alternative)
     characters = sorted(user["characters"], key=lambda x: (x.get(sort_by, "Unknown"), x["id"]))
 
-    # ✅ Group characters by sorting type
+    # ✅ Grouping characters based on sort type
     character_counts = {k: len(list(v)) for k, v in groupby(characters, key=lambda x: x["id"])}
     unique_characters = list({character['id']: character for character in characters}.values())
-    total_pages = max(1, math.ceil(len(unique_characters) / 15))  # Ensure at least 1 page
+    total_pages = max(1, math.ceil(len(unique_characters) / 15))
     page = max(0, min(page, total_pages - 1))
 
-    harem_message = f"<b>{escape(update.effective_user.first_name)}'s Collection - Page {page+1}/{total_pages}</b>\n"
+    # ✅ Improved UI
+    harem_message = (
+        f"📜 <b>{escape(update.effective_user.first_name)}'s Collection</b>\n"
+        f"📄 <b>Page {page+1}/{total_pages}</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+    )
 
-    # ✅ Fetch and group by selected sorting method
     current_characters = unique_characters[page * 15 : (page + 1) * 15]
     grouped_characters = {k: list(v) for k, v in groupby(current_characters, key=lambda x: x.get(sort_by, "Unknown"))}
 
     for category, characters in grouped_characters.items():
+        icon = CATEGORY_ICONS.get(category, "📦")  # Default if category icon is missing
         category_count = await collection.count_documents({"category": category})
-        harem_message += f'\n<b>{category} ({len(characters)}/{category_count})</b>\n'
+        harem_message += f"\n{icon} <b>{category}</b> ({len(characters)}/{category_count})\n"
+
         for character in characters:
             count = character_counts[character["id"]]
-            harem_message += f'{character["id"]} {character["name"]} ×{count}\n'
+            rarity_icon = RARITY_ICONS.get(character["rarity"], "🔹")
+            harem_message += f"{rarity_icon} <b>{character['name']}</b> ×{count}\n"
 
     total_count = len(user['characters'])
     keyboard = [
@@ -70,9 +86,9 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
     if total_pages > 1:
         nav_buttons = []
         if page > 0:
-            nav_buttons.append(InlineKeyboardButton("⬅️", callback_data=f"harem:{page-1}:{user_id}"))
+            nav_buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"harem:{page-1}:{user_id}"))
         if page < total_pages - 1:
-            nav_buttons.append(InlineKeyboardButton("➡️", callback_data=f"harem:{page+1}:{user_id}"))
+            nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"harem:{page+1}:{user_id}"))
         keyboard.append(nav_buttons)
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -80,15 +96,9 @@ async def harem(update: Update, context: CallbackContext, page=0) -> None:
     # ✅ Display Favorite Character if Available
     fav_character = next((c for c in user["characters"] if c["id"] == user.get("favorites", [None])[0]), None)
     if fav_character and "file_id" in fav_character:
-        if update.message:
-            await update.message.reply_photo(photo=fav_character["file_id"], caption=harem_message, reply_markup=reply_markup, parse_mode="HTML")
-        else:
-            await update.callback_query.edit_message_caption(caption=harem_message, reply_markup=reply_markup, parse_mode="HTML")
+        await update.message.reply_photo(photo=fav_character["file_id"], caption=harem_message, reply_markup=reply_markup, parse_mode="HTML")
     else:
-        if update.message:
-            await update.message.reply_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
-        else:
-            await update.callback_query.edit_message_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
+        await update.message.reply_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
 
 async def harem_callback(update: Update, context: CallbackContext) -> None:
     """Handles pagination for the /harem command."""

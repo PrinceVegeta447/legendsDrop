@@ -50,6 +50,7 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
         "starting_bid": starting_bid,
         "highest_bid": starting_bid,
         "highest_bidder": None,
+        "highest_bidder_name": "No Bids Yet",
         "end_time": time.time() + AUCTION_DURATION,
         "channel_id": channel_id,
         "message_id": None,
@@ -64,6 +65,7 @@ async def start_auction(update: Update, context: CallbackContext) -> None:
         f"🎴 <b>Character:</b> {character['name']}\n"
         f"🎖 <b>Rarity:</b> {character.get('rarity', 'Unknown')}\n"
         f"💰 <b>Starting Bid:</b> {starting_bid} CC\n"
+        f"👤 <b>Highest Bidder:</b> {auction_data['highest_bidder_name']}\n"
         f"📌 <b>Duration:</b> 10 minutes\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📢 <b>Bid using the buttons below!</b>"
@@ -100,6 +102,7 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
     _, auction_id, bid_increment = query.data.split(":")
     bid_increment = int(bid_increment)
     user_id = query.from_user.id
+    user_first_name = query.from_user.first_name
 
     # ✅ Fetch auction details
     auction = await auction_collection.find_one({"_id": ObjectId(auction_id), "status": "ongoing"})
@@ -131,7 +134,27 @@ async def handle_bid(update: Update, context: CallbackContext) -> None:
     # ✅ Update auction with new highest bid
     await auction_collection.update_one(
         {"_id": ObjectId(auction_id)},
-        {"$set": {"highest_bid": new_bid, "highest_bidder": user_id}}
+        {"$set": {"highest_bid": new_bid, "highest_bidder": user_id, "highest_bidder_name": user_first_name}}
+    )
+
+    # ✅ Update auction message in real-time
+    auction_message = (
+        f"⚔ <b>Auction Ongoing!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🎴 <b>Character:</b> {auction['character']['name']}\n"
+        f"🎖 <b>Rarity:</b> {auction['character'].get('rarity', 'Unknown')}\n"
+        f"💰 <b>Highest Bid:</b> {new_bid} CC\n"
+        f"👤 <b>Highest Bidder:</b> {user_first_name}\n"
+        f"📌 <b>Time Remaining:</b> Auction Ending Soon!\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📢 <b>Bid using the buttons below!</b>"
+    )
+
+    await context.bot.edit_message_caption(
+        chat_id=auction["channel_id"],
+        message_id=auction["message_id"],
+        caption=auction_message,
+        parse_mode="HTML"
     )
 
     await query.answer(f"✅ You bid {new_bid} CC!")
@@ -146,48 +169,22 @@ async def end_auction(auction_id, context: CallbackContext) -> None:
     highest_bid = auction["highest_bid"]
     character = auction["character"]
 
-    # ✅ Update auction status
     await auction_collection.update_one({"_id": ObjectId(auction_id)}, {"$set": {"status": "ended"}})
 
-    if not highest_bidder:
-        auction_message = "❌ **Auction Ended! No bids were placed.**"
-    else:
-        # ✅ Deduct CC & Add Character
+    if highest_bidder:
         await user_collection.update_one(
             {"id": highest_bidder},
             {"$inc": {"chrono_crystals": -highest_bid}, "$push": {"characters": character}}
         )
-
-        auction_message = (
-            f"🏆 **Auction Ended!**\n"
-            f"🎴 **Winner:** <a href='tg://user?id={highest_bidder}'>User {highest_bidder}</a>\n"
-            f"💰 **Winning Bid:** {highest_bid} CC\n"
-            f"🎖 **Character:** {character['name']}\n"
-            f"📌 **Congratulations to the winner!**"
-        )
-
-        # ✅ **Notify Winner via DM**
+        
         try:
             await context.bot.send_message(
                 chat_id=highest_bidder,
-                text=(
-                    f"🏆 **Congratulations!** 🎉\n\n"
-                    f"You have won the auction for:\n"
-                    f"🎴 **Character:** {character['name']}\n"
-                    f"💰 **Winning Bid:** {highest_bid} CC\n\n"
-                    f"The character has been added to your collection! 🏆"
-                ),
+                text=f"🏆 Congratulations {auction['highest_bidder_name']}! You won {character['name']} for {highest_bid} CC!",
                 parse_mode="HTML"
             )
         except Exception:
-            print(f"⚠️ Could not send DM to user {highest_bidder} (Maybe they disabled DMs).")
-
-    await context.bot.edit_message_caption(
-        chat_id=auction["channel_id"],
-        message_id=auction["message_id"],
-        caption=auction_message,
-        parse_mode="HTML"
-    )
+            pass  
 
 # ✅ Register Handlers
 application.add_handler(CommandHandler("auction", start_auction, block=False))

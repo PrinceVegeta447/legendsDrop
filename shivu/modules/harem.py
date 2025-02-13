@@ -19,8 +19,7 @@ CATEGORY_ICONS = {
 }
 
 RARITY_ICONS = {
-    "⛔ Common": "⚪", , "🍀 Rare": "🍀",
-    "🟣 Extreme": "🟣", "🟡 Sparking": "🟡", "🔱 Ultimate": "🔱",
+    "⛔ Common": "⛔", , "🍀 Rare": "🍀", "🟣 Extreme": "🟣", "🟡 Sparking": "🟡", "🔱 Ultimate": "🔱",
     "👑 Supreme": "👑", "🔮 Limited Edition": "🔮", "⛩️ Celestial": "⛩️"
 }
 

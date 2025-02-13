@@ -42,15 +42,20 @@ async def check_character(update: Update, context: CallbackContext) -> None:
 async def show_top_collectors(update: Update, context: CallbackContext) -> None:
     """Displays top collectors for a specific character globally."""
     query = update.callback_query
-    _, character_id = query.data.split(":")
+    _, character_id = query.data.split(":")  # Extract character_id
 
+    # ✅ Fetch Top Collectors of the Character
     pipeline = [
-        {"$match": {"characters.id": character_id}},  # Match users who own this character
-        {"$unwind": "$characters"},  # Flatten characters array
-        {"$match": {"characters.id": character_id}},  # Ensure only matching character is counted
-        {"$group": {"_id": "$id", "count": {"$sum": 1}, "first_name": {"$first": "$first_name"}}},
-        {"$sort": {"count": -1}},
-        {"$limit": 5}
+        {"$match": {"characters.id": character_id}},  # Find users who own this character
+        {"$unwind": "$characters"},  # Flatten the characters array
+        {"$match": {"characters.id": character_id}},  # Ensure only this character is counted
+        {"$group": {
+            "_id": "$id",
+            "count": {"$sum": 1},  # Count occurrences
+            "first_name": {"$first": "$first_name"}  # Fetch first name
+        }},
+        {"$sort": {"count": -1}},  # Sort by highest count
+        {"$limit": 5}  # Limit to top 5 collectors
     ]
 
     collectors = await user_collection.aggregate(pipeline).to_list(length=5)
@@ -59,6 +64,7 @@ async def show_top_collectors(update: Update, context: CallbackContext) -> None:
         await query.answer("❌ No collectors found for this character!", show_alert=True)
         return
 
+    # ✅ Format the Message
     message = "🏆 **Top Collectors for this Character:**\n"
     for i, user in enumerate(collectors, 1):
         message += f"{i}. {user['first_name']} - {user['count']} times\n"
@@ -71,24 +77,41 @@ async def show_local_collectors(update: Update, context: CallbackContext) -> Non
     _, character_id = query.data.split(":")
     group_id = query.message.chat.id
 
+    # ✅ Fetch all users who own the character
     pipeline = [
         {"$match": {"characters.id": character_id}},  # Match users who own this character
         {"$unwind": "$characters"},  # Flatten characters array
-        {"$match": {"characters.id": character_id}},  # Ensure only matching character is counted
-        {"$match": {"groups": group_id}},  # Filter only users in this group
-        {"$group": {"_id": "$id", "count": {"$sum": 1}, "first_name": {"$first": "$first_name"}}},
-        {"$sort": {"count": -1}},
-        {"$limit": 5}
+        {"$match": {"characters.id": character_id}},  # Ensure matching character
+        {"$group": {
+            "_id": "$id",
+            "count": {"$sum": 1}, 
+            "first_name": {"$first": "$first_name"}
+        }},
+        {"$sort": {"count": -1}},  # Sort by highest count
+        {"$limit": 10}  # Get top 10 to filter further
     ]
 
-    collectors = await user_collection.aggregate(pipeline).to_list(length=5)
+    collectors = await user_collection.aggregate(pipeline).to_list(length=10)
 
     if not collectors:
         await query.answer("❌ No collectors found in this group!", show_alert=True)
         return
 
+    # ✅ Filter Users Who Have Messaged in This Group
+    active_collectors = []
+    for user in collectors:
+        user_id = int(user["_id"])
+        chat_member = await context.bot.get_chat_member(group_id, user_id)
+        if chat_member.status in ["member", "administrator", "creator"]:  # Active members only
+            active_collectors.append(user)
+
+    if not active_collectors:
+        await query.answer("❌ No active collectors in this group!", show_alert=True)
+        return
+
+    # ✅ Format the Message
     message = "📍 **Collectors in this Group:**\n"
-    for i, user in enumerate(collectors, 1):
+    for i, user in enumerate(active_collectors[:5], 1):  # Show only top 5
         message += f"{i}. {user['first_name']} - {user['count']} times\n"
 
     await query.message.edit_text(message, parse_mode="Markdown")

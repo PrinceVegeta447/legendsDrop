@@ -68,10 +68,13 @@ async def start_purchase(update: Update, context: CallbackContext):
 
 # ✅ Verify character ID
 async def verify_character(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
     char_id = update.message.text.strip()
+    user_id = update.message.from_user.id
+    print(f"🔍 Received Character ID: {char_id}")  
 
     character = await collection.find_one({"id": char_id, "in_store": True})
+    print(f"🔍 Character Found: {character}")  
+
     if not character or character["stock"] <= 0:
         await update.message.reply_text("❌ Invalid ID or character out of stock!")
         return SELECT_ID
@@ -82,12 +85,12 @@ async def verify_character(update: Update, context: CallbackContext):
         return ConversationHandler.END
 
     context.user_data["character"] = character
-
     buttons = [
         [InlineKeyboardButton("✅ Confirm", callback_data="confirm_buy"),
          InlineKeyboardButton("❌ Cancel", callback_data="cancel_buy")]
     ]
     keyboard = InlineKeyboardMarkup(buttons)
+
     await update.message.reply_text(
         f"⚠️ Are you sure you want to buy **{character['name']}** for {character['price']} CC?",
         reply_markup=keyboard

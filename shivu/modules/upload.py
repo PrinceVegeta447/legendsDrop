@@ -9,15 +9,14 @@ WRONG_FORMAT_TEXT = """❌ Incorrect Format!
 Use: `/upload <file_id> <character-name> <rarity-number> <category-number>`
 
 🎖️ **Rarity Guide:**  
-1️⃣ Common  
-2️⃣ Uncommon  
-3️⃣ Rare  
-4️⃣ Extreme  
-5️⃣ Sparking  
-6️⃣ Ultra  
-7️⃣ Legends Limited  
-8️⃣ Zenkai  
-9️⃣ Event-Exclusive  
+Common 
+Rare
+Extreme 
+Sparkling 
+Limited Edition 
+Ultimate 
+Celestial 
+Supreme 
 
 🔹 **Category Guide:**  
 1. Saiyan  
@@ -85,14 +84,13 @@ async def upload(update: Update, context: CallbackContext) -> None:
 
         rarity_map = {
             "1": "⚪ Common",
-            "2": "🟢 Uncommon",
-            "3": "🔵 Rare",
-            "4": "🟣 Extreme",
-            "5": "🟡 Sparking",
-            "6": "🔱 Ultra",
-            "7": "💠 Legends Limited",
-            "8": "🔮 Zenkai",
-            "9": "🏆 Event-Exclusive"
+            "2": "🍀 Rare",
+            "3": "🟣 Extreme",
+            "4": "🟡 Sparking",
+            "5": "🔮 Limited Edition",
+            "6": "🔱 Ultimate",
+            "7": "⛩️ Celestial",
+            "8": "👑 Supreme"
         }
         rarity = rarity_map.get(rarity_input)
         if not rarity:

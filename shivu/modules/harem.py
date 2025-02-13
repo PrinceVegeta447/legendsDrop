@@ -19,9 +19,9 @@ CATEGORY_ICONS = {
 }
 
 RARITY_ICONS = {
-    "⚪ Common": "⚪", "🟢 Uncommon": "🟢", "🔵 Rare": "🔵",
-    "🟣 Extreme": "🟣", "🟡 Sparking": "🟡", "🔱 Ultra": "🔱",
-    "💠 Legends Limited": "💠", "🔮 Zenkai": "🔮", "🏆 Event-Exclusive": "🏆"
+    "⛔ Common": "⚪", , "🍀 Rare": "🍀",
+    "🟣 Extreme": "🟣", "🟡 Sparking": "🟡", "🔱 Ultimate": "🔱",
+    "👑 Supreme": "👑", "🔮 Limited Edition": "🔮", "⛩️ Celestial": "⛩️"
 }
 
 async def fetch_character_data(char_id):
@@ -106,7 +106,7 @@ async def generate_harem_message(user, page):
     grouped_characters = {k: list(v) for k, v in groupby(current_characters, key=lambda x: x.get(sort_by, "Unknown"))}
 
     for category, characters in grouped_characters.items():
-        icon = CATEGORY_ICONS.get(category, "⛩️")
+        icon = CATEGORY_ICONS.get(category, "⭐")
         category_count = await collection.count_documents({"category": category})
 
         # Add category header with a line break before characters

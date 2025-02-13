@@ -20,7 +20,7 @@ async def check_balance(update: Update, context: CallbackContext):
 
     text = f"""
 🏦 **Bank Account Summary**
-💰 **Wallet Zeni:** {zeni}
+💰 **Wallet Zeni:** {coins}
 🏦 **Bank Balance:** {bank_balance}
     """.strip()
 

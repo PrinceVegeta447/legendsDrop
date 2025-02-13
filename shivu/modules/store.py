@@ -10,10 +10,10 @@ MAX_STORE_ITEMS = 5
 # Fixed Prices for Rarity
 RARITY_PRICES = {
     "🟡 Sparking": 600,
-    "🔱 Ultra": 900,
-    "💠 Legends Limited": 1200,
-    "🔮 Zenkai": 1500,
-    "🏆 Event-Exclusive": 1800
+    "🔱 Ultimate": 2500,
+    "👑 Supreme": 10000, 
+    "⛩️ Celestial": 5000,
+    "🔮 Limited Edition": 1800
 }
 
 # Conversation states

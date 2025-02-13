@@ -140,14 +140,14 @@ async def loan_amount(update: Update, context: CallbackContext):
 
     try:
         amount = int(update.message.text)
-        max_loan = int(user.get("zeni", 0) * 0.5)
+        max_loan = int(user.get("coins", 0) * 0.5)
 
         if amount > max_loan:
             await update.message.reply_text(f"❌ You can only take up to {max_loan} Zeni.")
             return LOAN_AMOUNT
 
         loan_due = LOAN_REPAY_DAYS
-        await user_collection.update_one({"id": user_id}, {"$inc": {"zeni": amount, "loan": amount}, "$set": {"loan_due": loan_due}})
+        await user_collection.update_one({"id": user_id}, {"$inc": {"coins": amount, "loan": amount}, "$set": {"loan_due": loan_due}})
         await update.message.reply_text(f"✅ Loan of {amount} Zeni taken! Repay within {loan_due} days.")
         return ConversationHandler.END
     except ValueError:
@@ -186,11 +186,11 @@ async def confirm_repay(update: Update, context: CallbackContext):
     
 
     total_due = int(user["loan"] * (1 + LOAN_INTEREST_RATE))
-    if user["zeni"] < total_due:
+    if user["coins"] < total_due:
         await query.message.edit_text("❌ You don't have enough Zeni!")
         return ConversationHandler.END
 
-    await user_collection.update_one({"id": user_id}, {"$inc": {"zeni": -total_due, "loan": -user["loan"]}, "$set": {"loan_due": 0}})
+    await user_collection.update_one({"id": user_id}, {"$inc": {"coins": -total_due, "loan": -user["loan"]}, "$set": {"loan_due": 0}})
     await query.message.edit_text("✅ Loan repaid successfully!")
     return ConversationHandler.END
 

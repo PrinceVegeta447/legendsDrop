@@ -11,13 +11,15 @@ async def create_banner(update: Update, context: CallbackContext) -> None:
         return
 
     try:
-    args = shlex.split(update.message.text)
-    if len(args) != 3:
+        args = shlex.split(update.message.text)  # ✅ Corrected Indentation
+        if len(args) != 3:
             await update.message.reply_text(
                 "❌ <b>Usage:</b>\n<code>/createbanner &lt;name&gt; &lt;file_id&gt;</code>",
                 parse_mode="HTML"
             )
             return
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Error: {str(e)}")
 
         name, file_id = args
         banner = {"name": name, "file_id": file_id, "characters": []}

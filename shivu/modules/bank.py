@@ -189,6 +189,10 @@ async def confirm_repay(update: Update, context: CallbackContext):
     await query.message.edit_text("✅ Loan repaid successfully!")
     return ConversationHandler.END
 
+
+
+async def start_bank_system():
+    asyncio.create_task(apply_interest())
 # ✅ Handlers
 application.add_handler(CommandHandler("bank", check_balance))
 application.add_handler(CommandHandler("bankinfo", bank_info))
@@ -199,4 +203,4 @@ application.add_handler(CommandHandler("repay", repay_loan))
 application.add_handler(CallbackQueryHandler(confirm_repay, pattern="confirm_repay"))
 
 # ✅ Start Interest System
-asyncio.create_task(apply_interest())
+asyncio.run(start_bank_system())  # Start the async bank system

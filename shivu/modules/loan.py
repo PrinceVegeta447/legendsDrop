@@ -140,7 +140,7 @@ async def approve_loan(update: Update, context: CallbackContext) -> None:
     _, user_id = query.data.split(":")
     user_id = int(user_id)
 
-    if query.from_user.id != OWNER_ID:
+    if str(query.from_user.id) != OWNER_ID:
         await query.answer("❌ Only the bot owner can approve loans!", show_alert=True)
         return
 
@@ -168,8 +168,8 @@ async def reject_loan(update: Update, context: CallbackContext) -> None:
     _, user_id = query.data.split(":")
     user_id = int(user_id)
 
-    if query.from_user.id != OWNER_ID:
-        await query.answer("❌ Only the bot owner can reject loans!", show_alert=True)
+    if str(query.from_user.id) != OWNER_ID:
+        await query.answer("❌ Only the bot owner can approve loans!", show_alert=True)
         return
 
     await user_collection.update_one({"user_id": user_id}, {"$unset": {"loan": ""}})

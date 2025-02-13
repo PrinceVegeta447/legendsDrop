@@ -70,7 +70,7 @@ async def deposit_prompt(client, callback_query):
     def check(msg):
         return msg.from_user.id == callback_query.from_user.id and msg.text.isdigit()
 
-    response = await client.listen(callback_query.message.chat.id, filters=check, timeout=30)
+    response = await client.ask(callback_query.message.chat.id, filters=check, timeout=30)
     amount = int(response.text)
 
     user = await user_collection.find_one({"id": callback_query.from_user.id})
@@ -92,7 +92,7 @@ async def withdraw_prompt(client, callback_query):
     def check(msg):
         return msg.from_user.id == callback_query.from_user.id and msg.text.isdigit()
 
-    response = await client.listen(callback_query.message.chat.id, filters=check, timeout=30)
+    response = await client.ask(callback_query.message.chat.id, filters=check, timeout=30)
     amount = int(response.text)
 
     user = await user_collection.find_one({"id": callback_query.from_user.id})
@@ -114,7 +114,7 @@ async def transfer_prompt(client, callback_query):
     def check(msg):
         return msg.reply_to_message and msg.from_user.id == callback_query.from_user.id and msg.text.isdigit()
 
-    response = await client.listen(callback_query.message.chat.id, filters=check, timeout=30)
+    response = await client.ask(callback_query.message.chat.id, filters=check, timeout=30)
     amount = int(response.text)
     receiver_id = response.reply_to_message.from_user.id
 

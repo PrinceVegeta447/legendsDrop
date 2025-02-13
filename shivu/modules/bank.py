@@ -1,5 +1,5 @@
 import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import CommandHandler, ConversationHandler, MessageHandler, filters, CallbackContext
 from shivu import application, user_collection
 
@@ -7,21 +7,21 @@ from shivu import application, user_collection
 DEPOSIT_AMOUNT, WITHDRAW_AMOUNT = range(2)
 
 # Deposit & Withdraw Settings
-MIN_DEPOSIT = 500  # Minimum deposit amount
+MIN_DEPOSIT = 5000  # Minimum deposit amount
 MAX_WITHDRAW_PERCENT = 50  # Max 50% of bank balance per day
 
 # ✅ Check Bank Balance
 async def check_balance(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
-    user = await asyncio.to_thread(user_collection.find_one, {"id": user_id}) or {}
+    user = await user_collection.find_one({"id": user_id})  # Directly await the MongoDB query
 
-    bank_balance = user.get("bank_balance", 0)
-    zeni = user.get("coins", 0)
+    if not user:
+        user = {"bank_balance": 0, "coins": 0}  # Default values
 
     text = f"""
 🏦 **Bank Account Summary**
-💰 **Wallet Zeni:** {coins}
-🏦 **Bank Balance:** {bank_balance}
+💰 **Wallet Zeni:** {user.get("coins", 0)}
+🏦 **Bank Balance:** {user.get("bank_balance", 0)}
     """.strip()
 
     await update.message.reply_text(text)
@@ -33,7 +33,10 @@ async def deposit(update: Update, context: CallbackContext):
 
 async def deposit_amount(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
-    user = await asyncio.to_thread(user_collection.find_one, {"id": user_id}) or {}
+    user = await user_collection.find_one({"id": user_id})  
+
+    if not user:
+        user = {"bank_balance": 0, "coins": 0}
 
     try:
         amount = int(update.message.text)
@@ -45,7 +48,7 @@ async def deposit_amount(update: Update, context: CallbackContext):
             await update.message.reply_text("❌ You don't have enough Zeni!")
             return DEPOSIT_AMOUNT
 
-        await user_collection.update_one({"id": user_id}, {"$inc": {"coins": -amount, "bank_balance": amount}})
+        await user_collection.update_one({"id": user_id}, {"$inc": {"coins": -amount, "bank_balance": amount}}, upsert=True)
         await update.message.reply_text(f"✅ Deposited {amount} Zeni to your bank!")
         return ConversationHandler.END
     except ValueError:
@@ -59,7 +62,10 @@ async def withdraw(update: Update, context: CallbackContext):
 
 async def withdraw_amount(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
-    user = await asyncio.to_thread(user_collection.find_one, {"id": user_id}) or {}
+    user = await user_collection.find_one({"id": user_id})  
+
+    if not user:
+        user = {"bank_balance": 0, "coins": 0}
 
     try:
         amount = int(update.message.text)
@@ -73,7 +79,7 @@ async def withdraw_amount(update: Update, context: CallbackContext):
             await update.message.reply_text("❌ You don't have enough balance!")
             return WITHDRAW_AMOUNT
 
-        await user_collection.update_one({"id": user_id}, {"$inc": {"bank_balance": -amount, "coins": amount}})
+        await user_collection.update_one({"id": user_id}, {"$inc": {"bank_balance": -amount, "coins": amount}}, upsert=True)
         await update.message.reply_text(f"✅ Withdrawn {amount} Zeni from your bank!")
         return ConversationHandler.END
     except ValueError:

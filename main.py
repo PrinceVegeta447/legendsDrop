@@ -125,8 +125,8 @@ async def send_image(update: Update, context: CallbackContext) -> None:
         chat_id=chat_id,
         photo=file_id,
         caption=(
-            "🔥 𝑨 𝑪𝒉𝒂𝒓𝒂𝒄𝒕𝒆𝒓 𝑯𝒂𝒔 𝑨𝒑𝒑𝒆𝒂𝒓𝒆𝒅!🔥\n\n" 
- "⚡ 𝑩𝒆 𝒕𝒉𝒆 𝒇𝒊𝒓𝒔𝒕 𝒕𝒐 /𝒄𝒐𝒍𝒍𝒆𝒄𝒕 𝒕𝒉𝒆𝒎!"),
+            "🔥 A Character Has Appeared!🔥\n\n" 
+ "⚡ Be the first to /collect them!"),
         parse_mode='Markdown'
     )
 
@@ -135,15 +135,14 @@ async def send_image(update: Update, context: CallbackContext) -> None:
 
 # Define rewards based on rarity
 REWARD_TABLE = {
-    "⚪ Common": (100, 150, 1, 3),
-    "🟢 Uncommon": (150, 250, 2, 5),
-    "🔵 Rare": (200, 350, 3, 7),
+    "⛔ Common": (100, 150, 1, 3),
+    "🍀 Rare": (200, 350, 3, 7),
     "🟣 Extreme": (300, 450, 5, 10),
     "🟡 Sparking": (400, 600, 7, 12),
-    "🔱 Ultra": (500, 800, 10, 15),
-    "💠 Legends Limited": (750, 1200, 15, 20),
-    "🔮 Zenkai": (800, 1300, 20, 25),
-    "🏆 Event-Exclusive": (1000, 1500, 25, 30)
+    "🔮 Limited Edition": (500, 800, 10, 15),
+    "🔱 Ultimate": (750, 1200, 15, 20),
+    "👑 Supreme": (800, 1300, 20, 25),
+    "⛩️ Celestial": (1000, 1500, 25, 30)
 }
 
 

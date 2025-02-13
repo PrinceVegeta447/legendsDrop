@@ -1,140 +1,202 @@
-from pyrogram import filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from shivu import user_collection, shivuu
 import asyncio
+import time
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters, CallbackContext
+from shivu import application, user_collection
 
-INTEREST_RATE = 0.02  # 2% daily interest
+# Conversation states
+DEPOSIT_AMOUNT, WITHDRAW_AMOUNT, LOAN_AMOUNT, CONFIRM_REPAY = range(4)
+
+# Interest & Loan Settings
+DAILY_INTEREST_RATE = 0.02  # 2% daily interest
+LOAN_INTEREST_RATE = 0.10   # 10% loan interest
+LOAN_REPAY_DAYS = 7
 MIN_DEPOSIT = 500  # Minimum Zeni to deposit
-MIN_WITHDRAW = 500  # Minimum Zeni to withdraw
-BANK_INTEREST_INTERVAL = 86400  # 24 hours
+MAX_WITHDRAW_PERCENT = 50  # Max 50% of bank balance per day
 
+# ✅ Apply daily interest to all users
 async def apply_interest():
     while True:
-        users = await user_collection.find({"bank_balance": {"$gt": 0}}).to_list(length=1000)
+        users = await user_collection.find({"bank_balance": {"$gt": 0}}).to_list(None)
         for user in users:
-            interest = int(user["bank_balance"] * INTEREST_RATE)
-            await user_collection.update_one(
-                {"id": user["id"]}, {"$inc": {"bank_balance": interest}}
-            )
-        await asyncio.sleep(BANK_INTEREST_INTERVAL)
+            interest = int(user["bank_balance"] * DAILY_INTEREST_RATE)
+            await user_collection.update_one({"id": user["id"]}, {"$inc": {"bank_balance": interest}})
+        await asyncio.sleep(86400)  # Run once per day
 
-async def start_background_tasks():
-    await apply_interest()
+# ✅ Check Bank Balance
+async def check_balance(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    user = await user_collection.find_one({"id": user_id}) or {}
 
-loop = asyncio.get_event_loop()
-loop.create_task(start_background_tasks())
+    bank_balance = user.get("bank_balance", 0)
+    zeni = user.get("coins", 0)
+    loan = user.get("loan", 0)
+    loan_due = user.get("loan_due", 0)
 
-@shivuu.on_message(filters.command("bank"))
-async def bank_menu(client, message):
-    user = await user_collection.find_one({"id": message.from_user.id})
-    if not user:
-        await message.reply_text("❌ You don’t have an account. Use /openbank to create one.")
-        return
+    text = f"""
+🏦 **Bank Account Summary**
+💰 **Wallet Zeni:** {coins}
+🏦 **Bank Balance:** {bank_balance}
+📌 **Loan Taken:** {loan} (Due: {loan_due} days)
+    """.strip()
+    await update.message.reply_text(text)
 
-    wallet = user.get("coins", 0)
-    bank = user.get("bank_balance", 0)
+# ✅ Bank Info Command
+async def bank_info(update: Update, context: CallbackContext):
+    text = """
+🏦 **Bank System Explanation**
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💰 Deposit", callback_data="bank_deposit"),
-         InlineKeyboardButton("🏧 Withdraw", callback_data="bank_withdraw")],
-        [InlineKeyboardButton("🔄 Transfer", callback_data="bank_transfer")],
-    ])
+💰 **Deposit & Withdraw:**
+- Minimum deposit: 500 Zeni
+- Max daily withdrawal: 50% of bank balance
+- Deposited Zeni earns **2% daily interest**
 
-    await message.reply_text(
-        f"🏦 **Bank Account**\n"
-        f"💵 Wallet: {wallet} Zeni\n"
-        f"💳 Bank Balance: {bank} Zeni\n\n"
-        f"💲 **Earn 2% daily interest on bank deposits!**",
-        reply_markup=keyboard
+📌 **Loan System:**
+- Max loan: 50% of your Wallet Zeni
+- Loan must be repaid within **7 days**
+- Loan has **10% interest**
+
+💸 **Interest & Loan Penalty:**
+- Interest is added daily to your bank balance
+- If loan is not repaid in **7 days**, extra penalties apply!
+
+Use `/bank` to check your balance.
+    """.strip()
+    await update.message.reply_text(text)
+
+# ✅ Start Deposit
+async def deposit(update: Update, context: CallbackContext):
+    await update.message.reply_text("💰 Enter the amount of Zeni you want to deposit:")
+    return DEPOSIT_AMOUNT
+
+async def deposit_amount(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    user = await user_collection.find_one({"id": user_id}) or {}
+
+    try:
+        amount = int(update.message.text)
+        if amount < MIN_DEPOSIT:
+            await update.message.reply_text(f"❌ Minimum deposit is {MIN_DEPOSIT} Zeni.")
+            return DEPOSIT_AMOUNT
+
+        if amount > user.get("coins", 0):
+            await update.message.reply_text("❌ You don't have enough Zeni!")
+            return DEPOSIT_AMOUNT
+
+        await user_collection.update_one({"id": user_id}, {"$inc": {"coins": -amount, "bank_balance": amount}})
+        await update.message.reply_text(f"✅ Deposited {amount} Zeni to your bank!")
+        return ConversationHandler.END
+    except ValueError:
+        await update.message.reply_text("❌ Enter a valid number.")
+        return DEPOSIT_AMOUNT
+
+# ✅ Start Withdraw
+async def withdraw(update: Update, context: CallbackContext):
+    await update.message.reply_text("💸 Enter the amount of Zeni you want to withdraw:")
+    return WITHDRAW_AMOUNT
+
+async def withdraw_amount(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    user = await user_collection.find_one({"id": user_id}) or {}
+
+    try:
+        amount = int(update.message.text)
+        max_withdraw = int(user.get("bank_balance", 0) * (MAX_WITHDRAW_PERCENT / 100))
+
+        if amount > max_withdraw:
+            await update.message.reply_text(f"❌ You can only withdraw up to {max_withdraw} Zeni today.")
+            return WITHDRAW_AMOUNT
+
+        if amount > user.get("bank_balance", 0):
+            await update.message.reply_text("❌ You don't have enough balance!")
+            return WITHDRAW_AMOUNT
+
+        await user_collection.update_one({"id": user_id}, {"$inc": {"bank_balance": -amount, "coins": amount}})
+        await update.message.reply_text(f"✅ Withdrawn {amount} Zeni from your bank!")
+        return ConversationHandler.END
+    except ValueError:
+        await update.message.reply_text("❌ Enter a valid number.")
+        return WITHDRAW_AMOUNT
+
+# ✅ Take Loan
+async def take_loan(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    user = await user_collection.find_one({"id": user_id}) or {}
+
+    max_loan = int(user.get("coins", 0) * 0.5)
+    if max_loan <= 0:
+        await update.message.reply_text("❌ You are not eligible for a loan!")
+        return ConversationHandler.END
+
+    await update.message.reply_text(f"🏦 Enter loan amount (Max: {max_loan} Zeni):")
+    return LOAN_AMOUNT
+
+async def loan_amount(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    user = await user_collection.find_one({"id": user_id}) or {}
+
+    try:
+        amount = int(update.message.text)
+        max_loan = int(user.get("zeni", 0) * 0.5)
+
+        if amount > max_loan:
+            await update.message.reply_text(f"❌ You can only take up to {max_loan} Zeni.")
+            return LOAN_AMOUNT
+
+        loan_due = LOAN_REPAY_DAYS
+        await user_collection.update_one({"id": user_id}, {"$inc": {"zeni": amount, "loan": amount}, "$set": {"loan_due": loan_due}})
+        await update.message.reply_text(f"✅ Loan of {amount} Zeni taken! Repay within {loan_due} days.")
+        return ConversationHandler.END
+    except ValueError:
+        await update.message.reply_text("❌ Enter a valid number.")
+        return LOAN_AMOUNT
+
+# ✅ Repay Loan
+async def repay_loan(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    user = await user_collection.find_one({"id": user_id}) or {}
+
+    loan = user.get("loan", 0)
+    if loan <= 0:
+        await update.message.reply_text("✅ You have no active loans!")
+        return ConversationHandler.END
+
+    loan_due = user.get("loan_due", 0)
+    total_due = int(loan * (1 + LOAN_INTEREST_RATE))  # 10% interest
+
+    buttons = [
+        [InlineKeyboardButton(f"✅ Repay {total_due} Zeni", callback_data="confirm_repay")],
+        [InlineKeyboardButton("❌ Cancel", callback_data="cancel_repay")]
+    ]
+
+    await update.message.reply_text(
+        f"⚠️ Loan Due: {loan_due} days left\n💰 Total Due: {total_due} Zeni\n\nRepay now?",
+        reply_markup=InlineKeyboardMarkup(buttons)
     )
+    return CONFIRM_REPAY
 
-@shivuu.on_message(filters.command("openbank"))
-async def open_bank(client, message):
-    user = await user_collection.find_one({"id": message.from_user.id})
-    if user and "bank_balance" in user:
-        await message.reply_text("✅ You already have a bank account.")
-        return
+async def confirm_repay(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = query.from_user.id
+    user = await user_collection.find_one({"id": user_id}) or {}
 
-    await user_collection.update_one(
-        {"id": message.from_user.id}, 
-        {"$set": {"bank_balance": 0}}, 
-        upsert=True
-    )
+    total_due = int(user["loan"] * (1 + LOAN_INTEREST_RATE))
+    if user["zeni"] < total_due:
+        await query.message.edit_text("❌ You don't have enough Zeni!")
+        return ConversationHandler.END
 
-    await message.reply_text("🏦 **Bank account created successfully!**\nUse /bank to manage your Zeni.")
+    await user_collection.update_one({"id": user_id}, {"$inc": {"zeni": -total_due, "loan": -user["loan"]}, "$set": {"loan_due": 0}})
+    await query.message.edit_text("✅ Loan repaid successfully!")
+    return ConversationHandler.END
 
-@shivuu.on_callback_query(filters.regex("bank_deposit"))
-async def deposit_prompt(client, callback_query):
-    await callback_query.message.edit_text("💰 Enter the amount you want to deposit:")
+# ✅ Handlers
+application.add_handler(CommandHandler("bank", check_balance))
+application.add_handler(CommandHandler("bankinfo", bank_info))
+application.add_handler(CommandHandler("deposit", deposit))
+application.add_handler(CommandHandler("withdraw", withdraw))
+application.add_handler(CommandHandler("loan", take_loan))
+application.add_handler(CommandHandler("repay", repay_loan))
+application.add_handler(CallbackQueryHandler(confirm_repay, pattern="confirm_repay"))
 
-    def check(msg):
-        return msg.from_user.id == callback_query.from_user.id and msg.text.isdigit()
-
-    response = await client.ask(callback_query.message.chat.id, filters=check, timeout=30)
-    amount = int(response.text)
-
-    user = await user_collection.find_one({"id": callback_query.from_user.id})
-    if amount < MIN_DEPOSIT or amount > user.get("coins", 0):
-        await callback_query.message.reply_text("❌ Invalid amount.")
-        return
-
-    await user_collection.update_one(
-        {"id": user["id"]}, 
-        {"$inc": {"coins": -amount, "bank_balance": amount}}
-    )
-
-    await callback_query.message.reply_text(f"✅ Deposited {amount} Zeni to your bank!")
-
-@shivuu.on_callback_query(filters.regex("bank_withdraw"))
-async def withdraw_prompt(client, callback_query):
-    await callback_query.message.edit_text("🏧 Enter the amount you want to withdraw:")
-
-    def check(msg):
-        return msg.from_user.id == callback_query.from_user.id and msg.text.isdigit()
-
-    response = await client.ask(callback_query.message.chat.id, filters=check, timeout=30)
-    amount = int(response.text)
-
-    user = await user_collection.find_one({"id": callback_query.from_user.id})
-    if amount < MIN_WITHDRAW or amount > user.get("bank_balance", 0):
-        await callback_query.message.reply_text("❌ Invalid amount.")
-        return
-
-    await user_collection.update_one(
-        {"id": user["id"]}, 
-        {"$inc": {"coins": amount, "bank_balance": -amount}}
-    )
-
-    await callback_query.message.reply_text(f"✅ Withdrawn {amount} Zeni from your bank!")
-
-@shivuu.on_callback_query(filters.regex("bank_transfer"))
-async def transfer_prompt(client, callback_query):
-    await callback_query.message.edit_text("🔄 Reply to a user and enter the amount to transfer.")
-
-    def check(msg):
-        return msg.reply_to_message and msg.from_user.id == callback_query.from_user.id and msg.text.isdigit()
-
-    response = await client.ask(callback_query.message.chat.id, filters=check, timeout=30)
-    amount = int(response.text)
-    receiver_id = response.reply_to_message.from_user.id
-
-    sender = await user_collection.find_one({"id": callback_query.from_user.id})
-    receiver = await user_collection.find_one({"id": receiver_id})
-
-    if not receiver:
-        await callback_query.message.reply_text("❌ User does not have a bank account.")
-        return
-    if amount < 1 or amount > sender.get("bank_balance", 0):
-        await callback_query.message.reply_text("❌ Invalid amount.")
-        return
-
-    await user_collection.update_one(
-        {"id": sender["id"]}, {"$inc": {"bank_balance": -amount}}
-    )
-    await user_collection.update_one(
-        {"id": receiver["id"]}, {"$inc": {"bank_balance": amount}}
-    )
-
-    await callback_query.message.reply_text(
-        f"✅ Transferred {amount} Zeni to {response.reply_to_message.from_user.mention}!"
-    )
+# ✅ Start Interest System
+asyncio.create_task(apply_interest())

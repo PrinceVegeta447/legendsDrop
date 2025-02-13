@@ -2,7 +2,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
 from shivu import application, banners_collection, OWNER_ID, sudo_users
 from bson import ObjectId
-
+import shlex
+  # First argument is command itself
 # ✅ Create a New Banner
 async def create_banner(update: Update, context: CallbackContext) -> None:
     if update.effective_user.id not in sudo_users and update.effective_user.id != OWNER_ID:
@@ -10,8 +11,8 @@ async def create_banner(update: Update, context: CallbackContext) -> None:
         return
 
     try:
-        args = context.args
-        if len(args) != 2:
+    args = shlex.split(update.message.text)
+    if len(args) != 3:
             await update.message.reply_text(
                 "❌ <b>Usage:</b>\n<code>/createbanner &lt;name&gt; &lt;file_id&gt;</code>",
                 parse_mode="HTML"

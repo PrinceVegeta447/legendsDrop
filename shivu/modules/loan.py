@@ -9,6 +9,7 @@ LOAN_PLANS = {
 }
 
 async def request_loan(update: Update, context: CallbackContext) -> None:
+    """Handle loan requests."""
     user_id = update.effective_user.id
     args = context.args
 
@@ -28,9 +29,9 @@ async def request_loan(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ Invalid currency! Use `Zeni` or `CC`.", parse_mode="Markdown")
         return
 
-    existing_loan = await user_collection.find_one({"user_id": user_id, "loan.status": "pending"})
+    existing_loan = await user_collection.find_one({"user_id": user_id, "loan.status": {"$in": ["pending", "approved"]}})
     if existing_loan:
-        await update.message.reply_text("❌ You already have a pending loan request!")
+        await update.message.reply_text("❌ You already have a loan in progress!")
         return
 
     plan = LOAN_PLANS["basic"]
@@ -39,25 +40,23 @@ async def request_loan(update: Update, context: CallbackContext) -> None:
     total_repay = amount + interest
 
     loan_data = {
-        "user_id": user_id,
+        "status": "pending",
         "amount": amount,
         "currency": currency,
         "reason": reason,
-        "status": "pending",
         "approved_by": None,
         "due_date": due_date,
         "loan_plan": "Basic 7-day Loan",
-        "total_repay": total_repay
+        "total_repay": total_repay,
     }
 
     await user_collection.update_one({"user_id": user_id}, {"$set": {"loan": loan_data}}, upsert=True)
 
-    # Notify the owner in the loan approval channel
     keyboard = [
         [InlineKeyboardButton("✅ Approve", callback_data=f"approve_loan:{user_id}")],
         [InlineKeyboardButton("❌ Reject", callback_data=f"reject_loan:{user_id}")]
     ]
-    
+
     message = (
         f"📌 **New Loan Request**\n"
         f"👤 User: {update.effective_user.first_name}\n"
@@ -73,6 +72,7 @@ async def request_loan(update: Update, context: CallbackContext) -> None:
 application.add_handler(CommandHandler("loan", request_loan, block=False))
 
 async def approve_loan(update: Update, context: CallbackContext) -> None:
+    """Approve a loan request and credit the user."""
     query = update.callback_query
     _, user_id = query.data.split(":")
     user_id = int(user_id)
@@ -82,14 +82,28 @@ async def approve_loan(update: Update, context: CallbackContext) -> None:
         await query.answer("❌ Loan request not found!", show_alert=True)
         return
 
-    await user_collection.update_one({"user_id": user_id}, {"$set": {"loan.status": "approved", "loan.approved_by": query.from_user.id}})
-    
-    await context.bot.send_message(user_id, "✅ Your loan has been **approved**! Repay before the due date.")
-    await query.message.edit_text(f"✅ Loan for user {user_id} has been **approved**!")
+    amount = loan["loan"]["amount"]
+    currency = loan["loan"]["currency"]
+
+    # Update loan status and credit amount
+    await user_collection.update_one(
+        {"user_id": user_id},
+        {
+            "$set": {"loan.status": "approved", "loan.approved_by": query.from_user.id},
+            "$inc": {currency: amount},  # Add loan amount to balance
+        }
+    )
+
+    # Notify the user
+    await context.bot.send_message(user_id, f"✅ Your loan of {amount} {currency.capitalize()} has been **approved**! Repay before the due date.")
+
+    # Update the admin message
+    await query.message.edit_text(f"✅ Loan for user {user_id} has been **approved**!\n💰 {amount} {currency.capitalize()} added to their account.")
 
 application.add_handler(CallbackQueryHandler(approve_loan, pattern="^approve_loan:", block=False))
 
 async def repay_loan(update: Update, context: CallbackContext) -> None:
+    """Handle loan repayment."""
     user_id = update.effective_user.id
     args = context.args
 
@@ -110,23 +124,40 @@ async def repay_loan(update: Update, context: CallbackContext) -> None:
         return
 
     loan_amount = loan["loan"]["total_repay"]
+
+    # Check user balance before deducting
+    user_data = await user_collection.find_one({"user_id": user_id})
+    if user_data.get(currency, 0) < amount:
+        await update.message.reply_text(f"❌ Insufficient {currency.capitalize()} balance!")
+        return
+
     remaining = loan_amount - amount
 
     if remaining <= 0:
-        await user_collection.update_one({"user_id": user_id}, {"$unset": {"loan": ""}})
+        await user_collection.update_one(
+            {"user_id": user_id},
+            {"$unset": {"loan": ""}, "$inc": {currency: -amount}}
+        )
         await update.message.reply_text("🎉 Loan fully repaid!")
     else:
-        await user_collection.update_one({"user_id": user_id}, {"$set": {"loan.total_repay": remaining}})
+        await user_collection.update_one(
+            {"user_id": user_id},
+            {"$set": {"loan.total_repay": remaining}, "$inc": {currency: -amount}}
+        )
         await update.message.reply_text(f"✅ Partial payment received! Remaining: {remaining} {currency.capitalize()}")
 
 application.add_handler(CommandHandler("repay", repay_loan, block=False))
 
-async def check_loans():
+async def check_loans(context: CallbackContext):
+    """Check overdue loans and freeze accounts if necessary."""
     now = datetime.utcnow()
     overdue_loans = await user_collection.find({"loan.status": "approved", "loan.due_date": {"$lt": now}}).to_list(length=100)
 
     for user in overdue_loans:
-        await user_collection.update_one({"user_id": user["user_id"]}, {"$set": {"account_frozen": True}})
-        await context.bot.send_message(user["user_id"], "🚫 Your account has been frozen due to **loan default**!")
+        user_id = user["user_id"]
+        await user_collection.update_one({"user_id": user_id}, {"$set": {"account_frozen": True}})
 
-# Run daily in a background task
+        await context.bot.send_message(user_id, "🚫 Your account has been frozen due to **loan default**! Contact support to resolve.")
+
+# Schedule to run daily
+application.job_queue.run_daily(check_loans, time=datetime.time(hour=0, minute=0))

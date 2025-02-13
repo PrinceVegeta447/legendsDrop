@@ -19,8 +19,14 @@ CATEGORY_ICONS = {
 }
 
 RARITY_ICONS = {
-    "⛔ Common": "⛔", , "🍀 Rare": "🍀", "🟣 Extreme": "🟣", "🟡 Sparking": "🟡", "🔱 Ultimate": "🔱",
-    "👑 Supreme": "👑", "🔮 Limited Edition": "🔮", "⛩️ Celestial": "⛩️"
+    "⛔ Common": "⛔",
+    "🍀 Rare": "🍀",
+    "🟣 Extreme": "🟣",
+    "🟡 Sparking": "🟡",
+    "🔱 Ultimate": "🔱",
+    "👑 Supreme": "👑",
+    "🔮 Limited Edition": "🔮",
+    "⛩️ Celestial": "⛩️"
 }
 
 async def fetch_character_data(char_id):

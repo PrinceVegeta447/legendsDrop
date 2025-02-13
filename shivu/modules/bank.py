@@ -18,7 +18,11 @@ async def apply_interest():
             )
         await asyncio.sleep(BANK_INTEREST_INTERVAL)
 
-asyncio.create_task(apply_interest())
+async def start_background_tasks():
+    await apply_interest()
+
+loop = asyncio.get_event_loop()
+loop.create_task(start_background_tasks())
 
 @shivuu.on_message(filters.command("bank"))
 async def bank_menu(client, message):

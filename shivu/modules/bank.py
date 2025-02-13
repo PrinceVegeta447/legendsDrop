@@ -26,7 +26,7 @@ async def apply_interest():
 # ✅ Check Bank Balance
 async def check_balance(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
-    user = await user_collection.find_one({"id": user_id}) or {}
+    user = await asyncio.to_thread(user_collection.find_one, {"id": user_id}) or {}
 
     bank_balance = user.get("bank_balance", 0)
     zeni = user.get("coins", 0)
@@ -71,7 +71,7 @@ async def deposit(update: Update, context: CallbackContext):
 
 async def deposit_amount(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
-    user = await user_collection.find_one({"id": user_id}) or {}
+    user = await asyncio.to_thread(user_collection.find_one, {"id": user_id}) or {}
 
     try:
         amount = int(update.message.text)
@@ -97,7 +97,8 @@ async def withdraw(update: Update, context: CallbackContext):
 
 async def withdraw_amount(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
-    user = await user_collection.find_one({"id": user_id}) or {}
+    user = await asyncio.to_thread(user_collection.find_one, {"id": user_id}) or {}
+    
 
     try:
         amount = int(update.message.text)
@@ -121,7 +122,8 @@ async def withdraw_amount(update: Update, context: CallbackContext):
 # ✅ Take Loan
 async def take_loan(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
-    user = await user_collection.find_one({"id": user_id}) or {}
+    user = await asyncio.to_thread(user_collection.find_one, {"id": user_id}) or {}
+    
 
     max_loan = int(user.get("coins", 0) * 0.5)
     if max_loan <= 0:
@@ -133,7 +135,8 @@ async def take_loan(update: Update, context: CallbackContext):
 
 async def loan_amount(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
-    user = await user_collection.find_one({"id": user_id}) or {}
+    user = await asyncio.to_thread(user_collection.find_one, {"id": user_id}) or {}
+    
 
     try:
         amount = int(update.message.text)
@@ -154,7 +157,8 @@ async def loan_amount(update: Update, context: CallbackContext):
 # ✅ Repay Loan
 async def repay_loan(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
-    user = await user_collection.find_one({"id": user_id}) or {}
+    user = await asyncio.to_thread(user_collection.find_one, {"id": user_id}) or {}
+    
 
     loan = user.get("loan", 0)
     if loan <= 0:
@@ -178,7 +182,8 @@ async def repay_loan(update: Update, context: CallbackContext):
 async def confirm_repay(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
-    user = await user_collection.find_one({"id": user_id}) or {}
+    user = await asyncio.to_thread(user_collection.find_one, {"id": user_id}) or {}
+    
 
     total_due = int(user["loan"] * (1 + LOAN_INTEREST_RATE))
     if user["zeni"] < total_due:

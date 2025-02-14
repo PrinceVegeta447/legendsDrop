@@ -6,7 +6,7 @@ class Config(object):
     sudo_users = [1710597756]
     GROUP_ID = -1002483506913
     TOKEN = "7568918921:AAHT6_qx76-7hyG74S2T0eG1R1yWgqzXmWo"
-    mongo_url = "mongodb+srv://vegetakun447:1jPSDznTX6gy7Nqr@cluster0.hcngy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    mongo_url = "mongodb+srv://vegetakun447:TK1WRYfAESFT5vTe@cluster0.hcngy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
     PHOTO_URL = ["http://ibb.co/WvZ6gLTr"]
     SUPPORT_CHAT = "CollectYourLegends"
     UPDATE_CHAT = "CollectYourLegends"

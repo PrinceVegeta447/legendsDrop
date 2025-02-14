@@ -19,23 +19,13 @@ CATEGORY_ICONS = {
 }
 
 RARITY_ICONS = {
-    "⛔ Common": "⛔",
-    "🍀 Rare": "🍀",
-    "🟣 Extreme": "🟣",
-    "🟡 Sparking": "🟡",
-    "🔱 Ultimate": "🔱",
-    "👑 Supreme": "👑",
-    "🔮 Limited Edition": "🔮",
-    "⛩️ Celestial": "⛩️"
+    "⛔ Common": "⛔", "🍀 Rare": "🍀", "🟣 Extreme": "🟣",
+    "🟡 Sparking": "🟡", "🔱 Ultimate": "🔱", "👑 Supreme": "👑",
+    "🔮 Limited Edition": "🔮", "⛩️ Celestial": "⛩️"
 }
 
-async def fetch_character_data(char_id):
-    """Fetch character category from the main database."""
-    character = await collection.find_one({"id": char_id})
-    return character.get("category", "Unknown") if character else "Unknown"
-
 async def harem(update: Update, context: CallbackContext, page=0, query=None) -> None:
-    """Displays user's character collection."""
+    """Displays user's character collection with enhanced UI."""
     user_id = update.effective_user.id
     user = await user_collection.find_one({'id': user_id})
 
@@ -59,42 +49,13 @@ async def harem(update: Update, context: CallbackContext, page=0, query=None) ->
     else:
         await message.reply_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
 
-    
-async def harem_callback(update: Update, context: CallbackContext) -> None:
-    """Handles pagination for the /harem command."""
-    query = update.callback_query
-    _, page, user_id = query.data.split(':')
-    page = int(page)
-    user_id = int(user_id)
-
-    if query.from_user.id != user_id:
-        await query.answer("❌ This is not your collection!", show_alert=True)
-        return
-
-    # Fetch updated collection message
-    user = await user_collection.find_one({'id': user_id})
-    if not user or not user.get("characters"):
-        await query.answer("❌ You don't have any characters!", show_alert=True)
-        return
-
-    # Get updated collection message with pagination
-    harem_message, reply_markup, fav_character = await generate_harem_message(user, page)
-
-    # **Edit existing message instead of sending new one**
-    if fav_character and "file_id" in fav_character:
-        await query.message.edit_caption(caption=harem_message, reply_markup=reply_markup, parse_mode="HTML")
-    else:
-        await query.message.edit_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
-
-    await query.answer()
-
 async def generate_harem_message(user, page):
-    """Generates harem message and inline keyboard for pagination."""
+    """Generates a well-formatted harem message with inline buttons."""
     user_id = user['id']
     user_pref = await db.user_sorting.find_one({'user_id': user_id}) or {"sort_by": DEFAULT_SORT}
     sort_by = user_pref["sort_by"]
 
-    # Sorting logic
+    # Sorting characters
     characters = sorted(user["characters"], key=lambda x: (x.get(sort_by, "Unknown"), x["id"]))
     character_counts = {k: len(list(v)) for k, v in groupby(characters, key=lambda x: x["id"])}
     unique_characters = list({character['id']: character for character in characters}.values())
@@ -113,24 +74,23 @@ async def generate_harem_message(user, page):
     for category, characters in grouped_characters.items():
         icon = CATEGORY_ICONS.get(category, "⭐")
         category_count = await collection.count_documents({"category": category})
-
-        # Add category header with a line break before characters
-        harem_message += f"\n{icon} <b>{category}</b> ({len(characters)}/{category_count})\n\n"
+        harem_message += f"\n{icon} <b>{category}</b> ({len(characters)}/{category_count})\n"
 
         for character in characters:
             count = character_counts[character["id"]]
             rarity_icon = RARITY_ICONS.get(character["rarity"], "🔹")
-            
-            # Display character name with ID in brackets
-            harem_message += f"{rarity_icon} <b>{character['name']} ×{count} [{character['id']}]</b>\n"
+            harem_message += f"{rarity_icon} <b>{character['name']}</b> ×{count} [<code>{character['id']}</code>]\n"
 
     total_count = len(user['characters'])
     keyboard = [
-        [InlineKeyboardButton(f"📜 See Collection ({total_count})", switch_inline_query_current_chat=f"collection.{user_id}")],
-        [InlineKeyboardButton("📌 Sort by Rarity", callback_data="sort:rarity"),
-         InlineKeyboardButton("📂 Sort by Category", callback_data="sort:category")]
+        [InlineKeyboardButton(f"📜 View Full Collection ({total_count})", switch_inline_query_current_chat=f"collection.{user_id}")],
+        [
+            InlineKeyboardButton("📌 Sort: Rarity", callback_data="sort:rarity"),
+            InlineKeyboardButton("📂 Sort: Category", callback_data="sort:category")
+        ]
     ]
 
+    # Pagination buttons
     if total_pages > 1:
         nav_buttons = []
         if page > 0:
@@ -144,6 +104,31 @@ async def generate_harem_message(user, page):
 
     return harem_message, reply_markup, fav_character
 
+async def harem_callback(update: Update, context: CallbackContext) -> None:
+    """Handles pagination for the /harem command."""
+    query = update.callback_query
+    _, page, user_id = query.data.split(':')
+    page = int(page)
+    user_id = int(user_id)
+
+    if query.from_user.id != user_id:
+        await query.answer("❌ This is not your collection!", show_alert=True)
+        return
+
+    user = await user_collection.find_one({'id': user_id})
+    if not user or not user.get("characters"):
+        await query.answer("❌ You don't have any characters!", show_alert=True)
+        return
+
+    harem_message, reply_markup, fav_character = await generate_harem_message(user, page)
+
+    if fav_character and "file_id" in fav_character:
+        await query.message.edit_caption(caption=harem_message, reply_markup=reply_markup, parse_mode="HTML")
+    else:
+        await query.message.edit_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
+
+    await query.answer()
+
 async def sort_callback(update: Update, context: CallbackContext) -> None:
     """Handles sorting preference and saves it in the database."""
     query = update.callback_query
@@ -152,11 +137,10 @@ async def sort_callback(update: Update, context: CallbackContext) -> None:
 
     await db.user_sorting.update_one({"user_id": user_id}, {"$set": {"sort_by": sort_by}}, upsert=True)
 
-    await query.answer(f"✅ Collection will now be sorted by {sort_by.capitalize()}")
+    await query.answer(f"✅ Collection sorted by {sort_by.capitalize()}")
     await query.edit_message_text(f"✅ Collection is now sorted by **{sort_by.capitalize()}**. Use /collection to view.")
 
 # ✅ Register Handlers
 application.add_handler(CommandHandler(["harem", "collection"], harem, block=False))
 application.add_handler(CallbackQueryHandler(harem_callback, pattern="^harem", block=False))
-application.add_handler(CommandHandler("sort", user_collection, block=False))
 application.add_handler(CallbackQueryHandler(sort_callback, pattern="^sort:", block=False))

@@ -225,17 +225,16 @@ async def update(update: Update, context: CallbackContext) -> None:
         
         # Handle rarity separately
         rarity_map = {
-            "1": "⚪ Common",
-            "2": "🟢 Uncommon",
-            "3": "🔵 Rare",
-            "4": "🟣 Extreme",
-            "5": "🟡 Sparking",
-            "6": "🔱 Ultra",
-            "7": "💠 Legends Limited",
-            "8": "🔮 Zenkai",
-            "9": "🏆 Event-Exclusive"
+            "1": "⛔ Common",
+            "2": "🍀 Rare",
+            "3": "🟣 Extreme",
+            "4": "🟡 Sparking",
+            "5": "🔮 Limited Edition",
+            "6": "🔱 Ultimate",
+            "7": "⛩️ Celestial",
+            "8": "👑 Supreme"
         }
-
+        
         if field == "rarity":
             if new_value not in rarity_map:
                 await update.message.reply_text("❌ Invalid rarity. Use numbers 1-9.")

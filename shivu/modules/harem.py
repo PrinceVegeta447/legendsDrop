@@ -29,9 +29,9 @@ RARITY_ICONS = {
 }
 
 async def harem(update: Update, context: CallbackContext, page=0, query=None) -> None:
-    """Displays user's character collection."""
+    """Displays user's character collection with proper pagination."""
     user_id = update.effective_user.id
-    first_name = escape(update.effective_user.first_name)  # Get and escape first name
+    first_name = escape(update.effective_user.first_name)  # Escape first name
     user = await user_collection.find_one({'id': user_id})
 
     if not user or not user.get("characters"):
@@ -44,15 +44,18 @@ async def harem(update: Update, context: CallbackContext, page=0, query=None) ->
 
     harem_message, reply_markup, fav_character = await generate_harem_message(user, page, first_name)
 
-    if query:
-        message = query.message
-    else:
-        message = update.message
-
-    if fav_character and "file_id" in fav_character:
-        await message.reply_photo(photo=fav_character["file_id"], caption=harem_message, reply_markup=reply_markup, parse_mode="HTML")
-    else:
-        await message.reply_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
+    if query:  
+        # ✅ If callback query, EDIT the existing message instead of sending a new one
+        if fav_character and "file_id" in fav_character:
+            await query.message.edit_caption(caption=harem_message, reply_markup=reply_markup, parse_mode="HTML")
+        else:
+            await query.message.edit_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
+    else:  
+        # ✅ If normal command, send a new message
+        if fav_character and "file_id" in fav_character:
+            await update.message.reply_photo(photo=fav_character["file_id"], caption=harem_message, reply_markup=reply_markup, parse_mode="HTML")
+        else:
+            await update.message.reply_text(harem_message, parse_mode="HTML", reply_markup=reply_markup)
 
 async def generate_harem_message(user, page, first_name):
     """Generates harem message and inline keyboard for pagination."""
@@ -105,7 +108,7 @@ async def generate_harem_message(user, page, first_name):
 
     return harem_message, reply_markup, fav_character
 async def harem_callback(update: Update, context: CallbackContext) -> None:
-    """Handles pagination for the harem command."""
+    """Handles pagination properly without sending a new message."""
     query = update.callback_query
     data = query.data.split(":")
 

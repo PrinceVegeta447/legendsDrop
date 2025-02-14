@@ -71,7 +71,7 @@ async def show_top_collectors(update: Update, context: CallbackContext) -> None:
 
     await query.message.edit_text(message, parse_mode="Markdown")
 
-  async def show_local_collectors(update: Update, context: CallbackContext) -> None:
+async def show_local_collectors(update: Update, context: CallbackContext) -> None:
     """Displays collectors of a specific character in the current group."""
     query = update.callback_query
     _, character_id = query.data.split(":")

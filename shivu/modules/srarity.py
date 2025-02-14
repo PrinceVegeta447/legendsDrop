@@ -10,8 +10,8 @@ RARITIES = {
     "4": ("🟡", "Sparking"),
     "5": ("🔮", "Limited Edition"),
     "6": ("🔱", "Ultimate"),
-    "7": ("⛩️", "Celestial"),
-    "8": ("👑", "Supreme"),
+    "7": ("👑", "Supreme"),
+    "8": ("⛩️", "Celestial"),
 }
 
 async def srarity(update: Update, context: CallbackContext) -> None:

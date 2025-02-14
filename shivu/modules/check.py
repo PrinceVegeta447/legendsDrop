@@ -17,7 +17,7 @@ async def check_character(update: Update, context: CallbackContext) -> None:
 
     # ✅ Extract Character Details
     name = character["name"]
-    rarity_text = character.get("rarity", "❓ Unknown Rarity")  # Now uses stored values directly
+    rarity_text = character.get("rarity", "❓ Unknown Rarity")  
     category_text = character.get("category", "❓ Unknown Category")
 
     message = (
@@ -42,26 +42,26 @@ async def check_character(update: Update, context: CallbackContext) -> None:
 async def show_top_collectors(update: Update, context: CallbackContext) -> None:
     """Displays top collectors for a specific character globally."""
     query = update.callback_query
-    _, character_id = query.data.split(":")  # Extract character_id
+    _, character_id = query.data.split(":")  
 
-    # ✅ Fetch Top Collectors of the Character
+    # ✅ Fetch Top Collectors
     pipeline = [
-        {"$match": {"characters.id": character_id}},  # Find users who own this character
-        {"$unwind": "$characters"},  # Flatten the characters array
-        {"$match": {"characters.id": character_id}},  # Ensure only this character is counted
+        {"$match": {"characters.id": character_id}},  
+        {"$unwind": "$characters"},  
+        {"$match": {"characters.id": character_id}},  
         {"$group": {
             "_id": "$id",
-            "count": {"$sum": "$characters.count"},  # Sum the number of times they have it
-            "first_name": {"$first": "$first_name"}  # Fetch first name
+            "count": {"$sum": "$characters.count"},  
+            "first_name": {"$first": "$first_name"}  
         }},
-        {"$sort": {"count": -1}},  # Sort by highest count
-        {"$limit": 5}  # Limit to top 5 collectors
+        {"$sort": {"count": -1}},  
+        {"$limit": 5}  
     ]
 
     collectors = await user_collection.aggregate(pipeline).to_list(length=5)
 
     if not collectors:
-        await query.answer("❌ No collectors found for this character!", show_alert=True)
+        await query.answer("❌ No collectors found!", show_alert=True)
         return
 
     # ✅ Format the Message
@@ -79,16 +79,16 @@ async def show_local_collectors(update: Update, context: CallbackContext) -> Non
 
     # ✅ Fetch all users who own the character
     pipeline = [
-        {"$match": {"characters.id": character_id}},  # Match users who own this character
-        {"$unwind": "$characters"},  # Flatten characters array
-        {"$match": {"characters.id": character_id}},  # Ensure matching character
+        {"$match": {"characters.id": character_id}},  
+        {"$unwind": "$characters"},  
+        {"$match": {"characters.id": character_id}},  
         {"$group": {
             "_id": "$id",
-            "count": {"$sum": "$characters.count"},  # Sum up character copies
+            "count": {"$sum": "$characters.count"},  
             "first_name": {"$first": "$first_name"}
         }},
-        {"$sort": {"count": -1}},  # Sort by highest count
-        {"$limit": 10}  # Get top 10 to filter further
+        {"$sort": {"count": -1}},  
+        {"$limit": 10}  
     ]
 
     collectors = await user_collection.aggregate(pipeline).to_list(length=10)
@@ -97,16 +97,16 @@ async def show_local_collectors(update: Update, context: CallbackContext) -> Non
         await query.answer("❌ No collectors found in this group!", show_alert=True)
         return
 
-    # ✅ Filter Users Who Have Messaged in This Group
+    # ✅ Filter Active Members in the Group
     active_collectors = []
     for user in collectors:
         user_id = int(user["_id"])
         try:
             chat_member = await context.bot.get_chat_member(group_id, user_id)
-            if chat_member.status in ["member", "administrator", "creator"]:  # Active members only
+            if chat_member.status in ["member", "administrator", "creator"]:  
                 active_collectors.append(user)
         except:
-            pass  # Ignore users not found in group
+            pass  
 
     if not active_collectors:
         await query.answer("❌ No active collectors in this group!", show_alert=True)
@@ -114,12 +114,12 @@ async def show_local_collectors(update: Update, context: CallbackContext) -> Non
 
     # ✅ Format the Message
     message = "📍 **Collectors in this Group:**\n"
-    for i, user in enumerate(active_collectors[:5], 1):  # Show only top 5
+    for i, user in enumerate(active_collectors[:5], 1):  
         message += f"{i}. {user['first_name']} - [{user['count']}] \n"
 
     await query.message.edit_text(message, parse_mode="Markdown")
 
 # ✅ Register Handlers
 application.add_handler(CommandHandler("check", check_character, block=False))
-application.add_handler(CallbackQueryHandler(show_top_collectors, pattern="^top_collectors:", block=False))
-application.add_handler(CallbackQueryHandler(show_local_collectors, pattern="^local_collectors:", block=False))
+application.add_handler(CallbackQueryHandler(show_top_collectors, pattern="^show_top_collectors:", block=False))
+application.add_handler(CallbackQueryHandler(show_local_collectors, pattern="^show_local_collectors:", block=False))

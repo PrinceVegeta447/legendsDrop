@@ -9,7 +9,8 @@ import threading
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-from telegram import Update
+from telegram import Update, MessageEntity
+
 from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters
 
 from shivu import collection, top_global_groups_collection, group_user_totals_collection, user_collection, user_totals_collection, shivuu
@@ -58,42 +59,46 @@ import asyncio
 # Lock system to prevent race conditions in high-traffic groups
 locks = {}
 
+
 async def message_counter(update: Update, context: CallbackContext) -> None:
-    """Counts all message types and triggers character drops."""
     chat_id = str(update.effective_chat.id)
     user_id = update.effective_user.id
 
     if not user_id:  
-        return  # Ignore system messages or deleted messages
+        return  # Ignore system messages
 
     if chat_id not in locks:
         locks[chat_id] = asyncio.Lock()
     lock = locks[chat_id]
 
     async with lock:
-        # ✅ Fetch message frequency from MongoDB
+        # ✅ Fetch latest droptime from MongoDB
         chat_data = await user_totals_collection.find_one({'chat_id': chat_id})
         message_frequency = chat_data.get("message_frequency", 100) if chat_data else 100
 
-        # ✅ Identify Message Types (Counts Everything)
-        if any([
-            update.message.text,  # Text messages (includes emojis)
-            update.message.sticker,  # Stickers
-            update.message.photo,  # Photos
-            update.message.video,  # Videos
-            update.message.animation,  # GIFs
-            update.message.video_note,  # Video messages
-            update.message.voice,  # Voice messages
-            update.message.audio,  # Audio files
-            update.message.document,  # Files, PDFs, etc.
-            update.message.poll,  # Polls
-            update.message.dice,  # Dice & other Telegram animations
-            update.message.game  # Telegram games
-        ]):
-            message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
+        # ✅ Initialize message count if missing
+        if chat_id not in message_counts:
+            message_counts[chat_id] = 0
+
+        # ✅ Check if the message contains valid content (countable messages)
+        message = update.effective_message
+        if message:
+            if (
+                message.text  # Regular text messages (including emoji-only messages)
+                or message.sticker  # Stickers
+                or message.animation  # GIFs
+                or message.photo  # Images
+                or message.video  # Videos
+                or message.document  # Files like PDFs
+                or message.audio  # Audio files
+                or message.voice  # Voice messages
+                or message.video_note  # Video notes
+                or message.entities  # Entities like mentions, hashtags, etc.
+            ):
+                message_counts[chat_id] += 1  # ✅ Count all messages
 
         # ✅ Debugging Log
-        print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {message_counts[chat_id]} | Drop at: {message_frequency}")
+        print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {message_counts.get(chat_id, 0)} | Drop at: {message_frequency}")
 
         # ✅ Drop Character if Message Count Reached
         if message_counts[chat_id] >= message_frequency:

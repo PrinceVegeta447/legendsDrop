@@ -59,23 +59,38 @@ import asyncio
 locks = {}
 
 async def message_counter(update: Update, context: CallbackContext) -> None:
+    """Counts all message types and triggers character drops."""
     chat_id = str(update.effective_chat.id)
     user_id = update.effective_user.id
 
     if not user_id:  
-        return  # Ignore system messages
+        return  # Ignore system messages or deleted messages
 
     if chat_id not in locks:
         locks[chat_id] = asyncio.Lock()
     lock = locks[chat_id]
 
     async with lock:
-        # ✅ Fetch latest droptime from MongoDB
+        # ✅ Fetch message frequency from MongoDB
         chat_data = await user_totals_collection.find_one({'chat_id': chat_id})
         message_frequency = chat_data.get("message_frequency", 100) if chat_data else 100
 
-        # ✅ Count messages
-        message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
+        # ✅ Identify Message Types (Counts Everything)
+        if any([
+            update.message.text,  # Text messages (includes emojis)
+            update.message.sticker,  # Stickers
+            update.message.photo,  # Photos
+            update.message.video,  # Videos
+            update.message.animation,  # GIFs
+            update.message.video_note,  # Video messages
+            update.message.voice,  # Voice messages
+            update.message.audio,  # Audio files
+            update.message.document,  # Files, PDFs, etc.
+            update.message.poll,  # Polls
+            update.message.dice,  # Dice & other Telegram animations
+            update.message.game  # Telegram games
+        ]):
+            message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
 
         # ✅ Debugging Log
         print(f"🔍 [DEBUG] Group: {chat_id} | Messages: {message_counts[chat_id]} | Drop at: {message_frequency}")

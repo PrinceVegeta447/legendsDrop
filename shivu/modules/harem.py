@@ -104,7 +104,27 @@ async def generate_harem_message(user, page, first_name):
     fav_character = next((c for c in user["characters"] if c["id"] == user.get("favorites", [None])[0]), None)
 
     return harem_message, reply_markup, fav_character
-    
+async def harem_callback(update: Update, context: CallbackContext) -> None:
+    """Handles pagination for the harem command."""
+    query = update.callback_query
+    data = query.data.split(":")
+
+    if len(data) < 3:
+        await query.answer("Invalid callback data!", show_alert=True)
+        return
+
+    action, page, user_id = data[0], int(data[1]), int(data[2])
+
+    if action != "harem":
+        return
+
+    if update.effective_user.id != int(user_id):
+        await query.answer("❌ You can't view someone else's collection!", show_alert=True)
+        return
+
+    await harem(update, context, page=page, query=query)
+
+
 async def sort_callback(update: Update, context: CallbackContext) -> None:
     """Handles sorting preference and saves it in the database."""
     query = update.callback_query

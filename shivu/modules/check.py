@@ -51,7 +51,7 @@ async def show_top_collectors(update: Update, context: CallbackContext) -> None:
         {"$match": {"characters.id": character_id}},  # Ensure only this character is counted
         {"$group": {
             "_id": "$id",
-            "count": {"$sum": 1},  # Count occurrences
+            "count": {"$sum": "$characters.count"},  # Sum the number of times they have it
             "first_name": {"$first": "$first_name"}  # Fetch first name
         }},
         {"$sort": {"count": -1}},  # Sort by highest count
@@ -67,11 +67,11 @@ async def show_top_collectors(update: Update, context: CallbackContext) -> None:
     # ✅ Format the Message
     message = "🏆 **Top Collectors for this Character:**\n"
     for i, user in enumerate(collectors, 1):
-        message += f"{i}. {user['first_name']} - {user['count']} times\n"
+        message += f"{i}. {user['first_name']} - [{user['count']}] \n"
 
     await query.message.edit_text(message, parse_mode="Markdown")
 
-async def show_local_collectors(update: Update, context: CallbackContext) -> None:
+  async def show_local_collectors(update: Update, context: CallbackContext) -> None:
     """Displays collectors of a specific character in the current group."""
     query = update.callback_query
     _, character_id = query.data.split(":")
@@ -84,7 +84,7 @@ async def show_local_collectors(update: Update, context: CallbackContext) -> Non
         {"$match": {"characters.id": character_id}},  # Ensure matching character
         {"$group": {
             "_id": "$id",
-            "count": {"$sum": 1}, 
+            "count": {"$sum": "$characters.count"},  # Sum up character copies
             "first_name": {"$first": "$first_name"}
         }},
         {"$sort": {"count": -1}},  # Sort by highest count
@@ -101,9 +101,12 @@ async def show_local_collectors(update: Update, context: CallbackContext) -> Non
     active_collectors = []
     for user in collectors:
         user_id = int(user["_id"])
-        chat_member = await context.bot.get_chat_member(group_id, user_id)
-        if chat_member.status in ["member", "administrator", "creator"]:  # Active members only
-            active_collectors.append(user)
+        try:
+            chat_member = await context.bot.get_chat_member(group_id, user_id)
+            if chat_member.status in ["member", "administrator", "creator"]:  # Active members only
+                active_collectors.append(user)
+        except:
+            pass  # Ignore users not found in group
 
     if not active_collectors:
         await query.answer("❌ No active collectors in this group!", show_alert=True)
@@ -112,7 +115,7 @@ async def show_local_collectors(update: Update, context: CallbackContext) -> Non
     # ✅ Format the Message
     message = "📍 **Collectors in this Group:**\n"
     for i, user in enumerate(active_collectors[:5], 1):  # Show only top 5
-        message += f"{i}. {user['first_name']} - {user['count']} times\n"
+        message += f"{i}. {user['first_name']} - [{user['count']}] \n"
 
     await query.message.edit_text(message, parse_mode="Markdown")
 

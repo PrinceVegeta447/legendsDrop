@@ -1,27 +1,30 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext
 from shivu import user_collection, application
-import math
 
-# 🔹 Titles Based on Power Level
+# 🔹 Default Power Levels Based on Rarity
+RARITY_POWER = {
+    "⛔ Common": 100,
+    "🍀 Rare": 300,
+    "🟣 Extreme": 800,
+    "🟡 Sparking": 1500,
+    "🔱 Ultimate": 2500,
+    "👑 Supreme": 4000,
+    "🔮 Limited Edition": 6000,
+    "⛩️ Celestial": 10000
+}
+
+# 🔹 Power Titles Based on Power Level
 POWER_TITLES = [
     (5000, "🥋 Rookie Fighter"),
     (15000, "⚔️ Elite Warrior"),
     (30000, "🔥 Super Fighter"),
-    (float("inf"), "🏆 Legendary Saiyan"),
+    (50000, "⚡ Ultimate Fighter"),
+    (75000, "🌟 Legendary Saiyan"),
+    (100000, "🛡️ Mythic Champion"),
+    (150000, "🏆 Supreme God"),
+    (float("inf"), "👑 Omni-King")
 ]
-
-# 🔹 Rarity Icons (Your Rarities)
-RARITY_ICONS = {
-    "⛔ Common": "⛔",
-    "🍀 Rare": "🍀",
-    "🟣 Extreme": "🟣",
-    "🟡 Sparking": "🟡",
-    "🔱 Ultimate": "🔱",
-    "👑 Supreme": "👑",
-    "🔮 Limited Edition": "🔮",
-    "⛩️ Celestial": "⛩️"
-}
 
 async def powerlevel(update: Update, context: CallbackContext) -> None:
     """Shows user's power level, title, and character breakdown."""
@@ -32,22 +35,22 @@ async def powerlevel(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ You don’t own any characters yet!", parse_mode="HTML")
         return
 
-    # 🔹 Calculate Power Level
-    power_level = sum(c.get("power", 0) for c in user["characters"])
-    
-    # 🔹 Determine Power Level Title
+    # 🔹 Calculate Power Level Based on Rarity
+    power_level = sum(RARITY_POWER.get(char["rarity"], 100) for char in user["characters"])
+
+    # 🔹 Assign Power Level Title Dynamically
     title = next(t[1] for t in POWER_TITLES if power_level < t[0])
     
     # 🔹 Character Breakdown by Rarity
-    rarity_count = {r: 0 for r in RARITY_ICONS.keys()}
+    rarity_count = {r: 0 for r in RARITY_POWER.keys()}
     for char in user["characters"]:
         if char["rarity"] in rarity_count:
             rarity_count[char["rarity"]] += 1
     
-    rarity_display = "\n".join(f"{RARITY_ICONS[r]} {r} → {count} characters" for r, count in rarity_count.items() if count > 0)
+    rarity_display = "\n".join(f"{r} → {count} characters" for r, count in rarity_count.items() if count > 0)
 
     # 🔹 Power Progress Bar
-    max_pl = 50000  # Adjust based on game balance
+    max_pl = 150000  # Adjust based on game balance
     progress = min(power_level / max_pl, 1.0)
     bar = "▓" * int(progress * 10) + "░" * (10 - int(progress * 10))
 

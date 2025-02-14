@@ -28,8 +28,8 @@ async def check_character(update: Update, context: CallbackContext) -> None:
 
     # ✅ Buttons: Top Collectors | Show Collectors Here
     keyboard = [
-        [InlineKeyboardButton("🏆 Top Collectors", callback_data=f"top_collectors:{character_id}")],
-        [InlineKeyboardButton("📍 Show Collectors Here", callback_data=f"local_collectors:{character_id}")]
+        [InlineKeyboardButton("🏆 Top Collectors", callback_data=f"show_top_collectors:{character_id}")],
+        [InlineKeyboardButton("📍 Show Collectors Here", callback_data=f"show_local_collectors:{character_id}")]
     ]
 
     await update.message.reply_photo(

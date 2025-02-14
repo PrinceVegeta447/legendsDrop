@@ -1,6 +1,6 @@
 from telegram import Update
 from telegram.ext import CommandHandler, MessageHandler, CallbackContext, filters
-from shivu import user_collection, application, OWNER_ID, SUDO_USERS
+from shivu import user_collection, application, OWNER_ID
 
 # ✅ Check if a User is Banned
 async def is_banned(user_id: int) -> bool:
